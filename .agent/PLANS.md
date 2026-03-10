@@ -1,0 +1,180 @@
+# PLANS.md
+
+This file defines the execution-plan standard for this repository.
+An execution plan in this repo is called an **ExecPlan**.
+
+ExecPlans are used to design and drive multi-step work with clear acceptance criteria, validation, and follow-through.
+They are living documents and must stay current as implementation evolves.
+
+## When To Use An ExecPlan
+
+Create or update an ExecPlan before implementation when work is complex, cross-cutting, or high-risk, especially when it:
+
+- spans both UI and API layers,
+- introduces or changes a user workflow,
+- changes the semantic query contract,
+- changes chart behavior or supported chart types,
+- adds exports or shareable state,
+- changes auth, deployment, caching, or performance behavior.
+
+For small, isolated fixes, an ExecPlan is optional.
+
+## Relationship To Feature Briefs
+
+`.agent/SPEC.md` remains the repository-wide source of truth for baseline requirements.
+
+For substantial feature work, create a feature brief at:
+
+- `.agent/features/<YYYY-MM-DD>-<feature-name>/SPEC.md`
+
+Then create or update an ExecPlan in this file and reference that brief near the top.
+
+Feature briefs should stay focused on feature-local scope, acceptance criteria, constraints, non-goals, and rollout notes.
+
+## Core Principles
+
+Every ExecPlan must be:
+
+- **Self-contained**: a new contributor can execute it using only the plan and repo state.
+- **Outcome-focused**: it defines what the user can now do, not just what code changed.
+- **Executable**: it includes concrete files, endpoints, commands, and evidence.
+- **Living**: progress, discoveries, and decisions are updated during the work.
+- **Safe**: it notes risks, backward-compatibility concerns, and recovery steps.
+
+Define product or technical terms in plain language when they matter to execution.
+
+## Required Sections
+
+Each ExecPlan must include all sections below:
+
+1. Purpose / Big Picture
+2. Links
+3. Progress
+4. Surprises & Discoveries
+5. Decision Log
+6. Outcomes & Retrospective
+7. Context and Orientation
+8. Plan of Work
+9. Concrete Steps
+10. Validation and Acceptance
+11. Risks and Recovery
+12. Artifacts and Notes
+13. Interfaces and Dependencies
+
+`Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` are mandatory living sections and must be kept current.
+
+## Formatting Rules
+
+- Write in clear prose with short lists where useful.
+- Use repository-relative paths.
+- Include exact commands with working directory context.
+- Include concise evidence snippets when useful.
+- Keep plans easy to diff and update.
+
+## Repository-Specific Acceptance Bar
+
+For this project, an ExecPlan is only complete when the defined scope demonstrates:
+
+- the user workflow works end-to-end,
+- the API contract and UI behavior agree,
+- loading, empty, and error states are handled,
+- validation covers the riskiest paths,
+- docs are updated where behavior changed.
+
+When production dependencies are unavailable, provide local or mocked validation plus explicit production verification steps.
+
+## ExecPlan Template
+
+Copy this template for each substantial project task.
+
+---
+
+# <ExecPlan title>
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+## Purpose / Big Picture
+
+Describe the user-visible outcome. Explain what becomes possible after this change and how someone can observe it.
+
+## Links
+
+- Branch: `<feature-branch-name>`
+- Feature brief: `.agent/features/<YYYY-MM-DD>-<feature-name>/SPEC.md` or `N/A`
+- PR: `<url or pending>`
+
+## Progress
+
+- [ ] (YYYY-MM-DD HH:MMZ) Initial planning completed.
+- [ ] Implementation milestone 1 completed.
+- [ ] Validation and documentation updates completed.
+
+## Surprises & Discoveries
+
+- Observation: <unexpected behavior, risk, or insight>
+  Evidence: <short command output, UI behavior, or test signal>
+
+## Decision Log
+
+- Decision: <what was decided>
+  Rationale: <why this choice>
+  Date/Author: <YYYY-MM-DD, name/agent>
+
+## Outcomes & Retrospective
+
+Summarize achieved outcomes, remaining gaps, and lessons learned. Compare results against the original purpose.
+
+## Context and Orientation
+
+Explain the current relevant repository state for a newcomer. Name key files and how they connect, for example:
+
+- `app/*` for routes and server components,
+- `app/api/*` or `src/app/api/*` for route handlers,
+- `components/*` for shared UI,
+- `lib/*` for query, formatting, and data-access utilities,
+- `tests/*` for validation coverage.
+
+## Plan of Work
+
+Describe the sequence of edits and why. Be explicit about paths, modules, components, and intended behavior.
+
+## Concrete Steps
+
+List exact commands with working directory. Example:
+
+    cd /path/to/repo
+    npm run lint
+    npm run typecheck
+    npm test
+
+Include expected outcomes for each command.
+
+## Validation and Acceptance
+
+Define observable acceptance criteria. Prefer user-facing behavior checks, for example:
+
+- a user can find a metric through search,
+- query filters produce the expected result shape,
+- the selected chart renders with the expected data,
+- exports match the visible table,
+- invalid query states fail cleanly.
+
+## Risks and Recovery
+
+Describe known risks, safe re-run behavior, rollback paths, and recovery steps for partial failures or bad deploys.
+
+## Artifacts and Notes
+
+Include concise evidence snippets, screenshots, test notes, or follow-up observations that prove success.
+
+## Interfaces and Dependencies
+
+Name endpoints, libraries, modules, third-party services, and any required interfaces or contracts that must exist at completion.
+
+---
+
+## Optional: Active ExecPlan Index
+
+Use this section to track in-flight plans:
+
+- `<date> - <plan name> - status: planned|in_progress|blocked|done - owner: <name>`

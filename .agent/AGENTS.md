@@ -8,6 +8,7 @@ It complements `README.md`, product docs, and `.agent/SPEC.md` by focusing on ex
 - Repository purpose: build a self-serve macro data dashboard in Next.js for exploring curated database data.
 - Deployment target: Vercel.
 - Repository shape: one repo containing both the frontend UI and the server-side API/query layer.
+- Runtime data access: the app server connects directly to the macro Postgres database for now, without a reverse proxy.
 - Product priority: make data discovery, charting, and export easy for non-technical users.
 - Source of truth for product and engineering requirements: `.agent/SPEC.md`.
 
@@ -95,8 +96,10 @@ Agents should treat this as the default architecture unless the user requests ot
 
 - Never let the browser talk directly to the database.
 - Never build unrestricted text-to-SQL as a default interface.
+- Prefer direct server-to-Postgres access unless requirements justify introducing a proxy layer.
 - Prefer parameterized, validated server-side query builders over ad hoc query strings.
 - Keep database access read-only for the application runtime unless a feature explicitly requires writes.
+- Use a dedicated database user whose access is limited to the `serving` schema.
 - Treat metric definitions, labels, and caveats as first-class data that may live outside the fact tables.
 
 ## UX and Product Conventions

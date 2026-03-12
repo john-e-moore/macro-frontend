@@ -83,10 +83,11 @@ The browser must not connect directly to the database.
 
 Instead:
 
+- The Next.js server/runtime may connect directly to the macro Postgres database; no reverse proxy is required for now.
 - UI controls call validated server-side query endpoints or server-side utilities.
 - The server maps user-friendly metric selections to safe query logic.
 - Query parameters are validated before execution.
-- Application database access should be read-only by default.
+- Application database access should use a dedicated read-only user limited to the `serving` schema.
 
 ### 4. Semantic Layer
 
@@ -287,6 +288,7 @@ The user should not need to know internal table names to find a metric.
 - No secrets committed to the repository.
 - Validate all user input on the server.
 - Keep app database access read-only unless a feature explicitly requires writes.
+- Prefer direct server-to-Postgres access over an added reverse proxy unless requirements change.
 - If authentication is added later, design it cleanly rather than scattering auth logic across route handlers.
 
 ---

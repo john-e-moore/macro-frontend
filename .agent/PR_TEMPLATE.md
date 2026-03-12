@@ -13,6 +13,7 @@ Keep it concise, product-aware, and evidence-based.
 - Branch: `<feature-branch-name>`
 - Feature brief: `.agent/features/<YYYY-MM-DD>-<feature-name>/SPEC.md` or `N/A`
 - ExecPlan entry: `.agent/PLANS.md` (`<plan title>`)
+- `.cursor` plan: `.cursor/plans/<plan-file>.md` or `N/A`
 
 ## Scope and Non-Goals
 

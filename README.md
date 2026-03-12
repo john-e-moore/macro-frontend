@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Macro Frontend
 
-## Getting Started
+`macro-frontend` is a Next.js App Router application for a guided, self-serve macro dashboard. The repository contains both the user-facing UI and the server-side query/export layer. It follows the product and delivery constraints in `.agent/SPEC.md`, `.agent/ROADMAP.md`, and `.agent/AGENTS.md`.
 
-First, run the development server:
+## Product Goals
+
+The app should help non-technical users:
+
+- discover curated macro metrics,
+- understand definitions, units, sources, and caveats,
+- build simple geography and time comparisons,
+- view results as trusted tables or a limited chart set,
+- export the exact filtered result they are looking at.
+
+## Architecture
+
+Phase 0 establishes the repository shape and contract boundaries for later roadmap phases:
+
+- `app/`: App Router pages and route handlers.
+- `app/api/`: validated server-side endpoints for search, metadata lookup, queries, chart recommendation, and export.
+- `components/`: reusable UI building blocks and foundation shell components.
+- `lib/catalog/`: semantic metric catalog types, seed data, and helpers.
+- `lib/contracts/`: stable request and response contracts shared by route handlers and callers.
+- `lib/db/`: server-only database access utilities using a read-only Postgres user.
+- `lib/services/`: thin domain services backing the API routes.
+- `lib/validation/`: request parsing helpers.
+- `tests/`: baseline catalog, contract, and environment tests.
+
+## Environment Setup
+
+Copy `.env.template` to `.env` and fill in the Postgres credentials for a dedicated read-only user.
+
+Required server-only variables:
+
+- `PG_HOST`
+- `PG_PORT`
+- `PG_DATABASE`
+- `PG_USER`
+- `PG_PASSWORD`
+- `PG_URL`
+
+Optional variables:
+
+- `MACRO_DB_SCHEMA` defaults to `serving`
+- `NEXT_PUBLIC_APP_URL` defaults to `http://localhost:3000`
+
+The browser must never connect directly to Postgres. Database access belongs in `lib/db/` and should always flow through validated server-side contracts.
+
+## Local Development
+
+Install dependencies and start the development server:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Validation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Use these checks before considering a milestone complete:
 
-## Learn More
+```bash
+npm run lint
+npm run typecheck
+npm run test
+```
 
-To learn more about Next.js, take a look at the following resources:
+If real database credentials are unavailable, Phase 0 tests still run because the current API surface is backed by typed contracts and lightweight seed data.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Current Phase 0 Surface
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Phase 0 intentionally provides a real foundation without completing the full Phase 1 user workflow:
 
-## Deploy on Vercel
+- product-aware landing page shell,
+- semantic metric catalog model and helpers,
+- server-only database configuration and pool factory,
+- validated API contracts for search, metadata, query, chart recommendation, and export,
+- CSV and XLSX export generation from the shared query result shape.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Planning And PRs
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The active implementation plan for this phase lives in `.cursor/plans/phase-0_foundations_658d864f.plan.md`.
+- Cross-cutting work should also be tracked in `.agent/PLANS.md`.
+- Substantial pull requests should follow `.agent/PR_TEMPLATE.md`, including a `.cursor/` plan reference when one exists.

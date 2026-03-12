@@ -177,4 +177,126 @@ Name endpoints, libraries, modules, third-party services, and any required inter
 
 Use this section to track in-flight plans:
 
-- `<date> - <plan name> - status: planned|in_progress|blocked|done - owner: <name>`
+- `2026-03-12 - Phase 0 Foundations - status: in_progress - owner: Cursor agent`
+
+---
+
+# Phase 0 Foundations
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+## Purpose / Big Picture
+
+Replace the starter app with a repository foundation that clearly encodes the macro dashboard product: App Router structure, server-only Postgres access, semantic metric catalog types, validated query contracts, thin route handlers, and baseline docs and tests.
+
+## Links
+
+- Branch: `phase-0-foundations`
+- Feature brief: `N/A`
+- PR: `pending`
+- `.cursor` plan: `.cursor/plans/phase-0_foundations_658d864f.plan.md`
+
+## Progress
+
+- [x] (2026-03-12 00:00Z) Initial planning completed in `.cursor/plans/phase-0_foundations_658d864f.plan.md`.
+- [x] Foundation modules and route handlers completed.
+- [x] Validation and documentation updates completed.
+
+## Surprises & Discoveries
+
+- Observation: The repo already had a saved `.cursor` plan, but the codebase itself was still almost entirely the default starter app.
+  Evidence: `app/page.tsx`, `app/layout.tsx`, and `README.md` were still generated starter files.
+- Observation: Adding the `xlsx` package introduces an upstream audit warning that should be tracked separately from Phase 0 behavior.
+  Evidence: `npm install xlsx` reported `1 high severity vulnerability`.
+
+## Decision Log
+
+- Decision: Keep Phase 0 API routes real and validated, but back them with lightweight catalog-backed services instead of production SQL queries.
+  Rationale: This establishes stable contracts without overbuilding Phase 1 workflows before the semantic model is settled.
+  Date/Author: 2026-03-12, Cursor agent
+- Decision: Commit the `.cursor` plan file alongside the implementation.
+  Rationale: The user explicitly requested that the PR include the saved plan, and the plan is part of the execution record for this cross-cutting change.
+  Date/Author: 2026-03-12, Cursor agent
+
+## Outcomes & Retrospective
+
+Phase 0 now replaces the starter app with a documented repository foundation:
+
+- product-aware landing page and metadata,
+- typed semantic catalog and contract modules,
+- thin validated API handlers,
+- server-only Postgres pool factory,
+- CSV/XLSX export generation,
+- lint, typecheck, test, and runtime smoke-check evidence.
+
+Remaining follow-up is operational rather than structural: track the `xlsx` audit warning and swap the sample query service for live `serving`-layer reads in Phase 1.
+
+## Context and Orientation
+
+- `app/*` contains the landing page shell and API handlers.
+- `components/*` contains reusable presentation modules for the foundation shell.
+- `lib/catalog/*` contains semantic metric catalog definitions and seed data.
+- `lib/contracts/*` contains shared request and response schemas.
+- `lib/db/*` contains server-only Postgres access helpers.
+- `lib/services/*` contains thin business logic behind the route handlers.
+- `tests/*` contains baseline unit coverage for the new foundation.
+
+## Plan of Work
+
+1. Replace starter docs and metadata with product-aware repository documentation.
+2. Add typed env and database foundation modules.
+3. Add semantic catalog types, contracts, validation helpers, and service modules.
+4. Add App Router route handlers and a lightweight landing page shell.
+5. Add test tooling, baseline tests, and run lint, typecheck, and test.
+6. Commit, push, and open a PR that references the `.cursor` plan.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-frontend
+    npm install
+    npm run lint
+    npm run typecheck
+    npm run test
+
+Expected outcomes:
+
+- dependencies install cleanly,
+- lint and typecheck pass,
+- baseline tests pass without requiring live database credentials.
+
+## Validation and Acceptance
+
+- A newcomer can locate where routes, contracts, catalog logic, db access, and tests belong.
+- Invalid API inputs fail with clear validation errors.
+- The landing page reflects the macro dashboard product instead of create-next-app defaults.
+- Export routes can produce CSV and XLSX responses from the shared result shape.
+- Docs mention the `.cursor` plan and the server-only Postgres model.
+
+## Risks and Recovery
+
+- Risk: Phase 0 could drift into Phase 1 feature work.
+  Recovery: keep API responses intentionally lightweight and avoid adding interactive builder flows.
+- Risk: Database env validation could break local validation without credentials.
+  Recovery: validate env lazily when the db module is used instead of at app import time.
+- Risk: Export dependencies can add vulnerability noise.
+  Recovery: document the audit warning and keep follow-up remediation scoped separately.
+
+## Artifacts and Notes
+
+- Plan file: `.cursor/plans/phase-0_foundations_658d864f.plan.md`
+- PR template update: `.agent/PR_TEMPLATE.md`
+- Validation:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test`
+  - runtime smoke checks against `/api/metrics/search`, `/api/metrics/[metricId]`, `/api/query`, and `/api/export`
+
+## Interfaces and Dependencies
+
+- Dependencies: `next`, `react`, `zod`, `pg`, `server-only`, `xlsx`, `vitest`
+- Planned endpoints:
+  - `GET /api/metrics/search`
+  - `GET /api/metrics/[metricId]`
+  - `POST /api/query`
+  - `POST /api/chart-recommendation`
+  - `POST /api/export`

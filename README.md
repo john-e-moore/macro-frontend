@@ -14,7 +14,7 @@ The app should help non-technical users:
 
 ## Architecture
 
-Phase 1 builds on the completed foundation and now connects the semantic catalog to live serving-layer queries:
+Phase 1 builds on the completed foundation and now connects the semantic catalog to live serving-layer queries and user-facing product routes:
 
 - `app/`: App Router pages and route handlers.
 - `app/api/`: validated server-side endpoints for search, metadata lookup, queries, chart recommendation, and export.
@@ -71,13 +71,18 @@ If real database credentials are unavailable, catalog and contract tests still r
 
 ## Current Phase 1 Surface
 
-The app now ships three serving-backed workflows:
+The app now ships the MVP route structure described in the roadmap:
 
-- state PCE maps with total/per-capita toggles and category filters,
+- `/` is a landing page with guided entry points and starter journeys.
+- `/catalog` supports metric search, category browsing, and reusable metadata inspection.
+- `/explore` provides a URL-backed query builder, result surface, chart switching, and CSV/XLSX export actions.
+
+The live metric workflows currently cover:
+
+- state PCE maps and multi-year PCE level comparisons,
 - selected-state aggregate recomputation alongside derived US overall values,
 - PCE trend storytelling with all-items implicit inflation and category-level nominal growth,
-- federal direct-transfer and program-funding comparisons against state GDP,
-- CSV and XLSX export generation from the shared query result shape.
+- federal direct-transfer and program-funding comparisons against state GDP.
 
 ## Data Notes
 
@@ -85,8 +90,16 @@ The app now ships three serving-backed workflows:
 - Per-capita PCE is derived in the app from raw PCE plus resident population because the current serving convenience view duplicates Census rows.
 - True state-category PCE price indexes are not available in the current serving layer, so category trend stories use nominal PCE growth. All-items implicit PCE inflation is still available via nominal versus real PCE.
 
+## MVP Workflow
+
+1. Start on `/` and choose either a curated starter journey or a direct path into the catalog or explorer.
+2. Use `/catalog` to search metrics in plain English and inspect the reusable metadata panel.
+3. Open `/explore` with a prefilled metric or start from defaults, then adjust metric, category, state selection, time range, comparison mode, and view.
+4. Share or refresh the configured explorer URL without losing the current query state.
+5. Export the exact filtered result as CSV or XLSX from the result surface.
+
 ## Planning And PRs
 
-- The active implementation plan for this phase lives in `.cursor/plans/metrics_phase_one_a0753413.plan.md`.
+- The active implementation plans for this repo live in `.cursor/plans/metrics_phase_one_a0753413.plan.md` and `.cursor/plans/phase_1_mvp_07bff4ef.plan.md`.
 - Cross-cutting work should also be tracked in `.agent/PLANS.md`.
 - Substantial pull requests should follow `.agent/PR_TEMPLATE.md`, including a `.cursor/` plan reference when one exists.

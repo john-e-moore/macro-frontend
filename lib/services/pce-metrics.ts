@@ -193,15 +193,12 @@ async function fetchRealPce(startYear: number, endYear: number) {
 function buildStateDisplayRows(
   levelRows: PceLevelRow[],
   metricId: string,
-  request: QueryRequest,
   populationRows: PopulationRow[] = [],
 ) {
-  const selectedYear = request.timeRange.endYear;
   const levelIndex = indexByStateYear(levelRows);
   const populationIndex = indexByStateYear(populationRows);
-  const selectedLevelRows = levelRows.filter((row) => row.year === selectedYear);
 
-  return selectedLevelRows.map((row) => {
+  return levelRows.map((row) => {
     const population = populationIndex.get(`${row.state_abbrev}:${row.year}`)?.population ?? null;
     const value =
       metricId === "pce-per-capita"
@@ -274,9 +271,12 @@ export async function buildPceLevelResponse(
     fetchPopulation(request.timeRange.startYear, request.timeRange.endYear),
   ]);
 
-  const displayRows = buildStateDisplayRows(levelRows, metric.id, request, populationRows);
+  const displayRows = buildStateDisplayRows(levelRows, metric.id, populationRows);
   const selectedStates = toSelectionSet(request.geography.values, levelRows);
   const selectedYearRows = levelRows.filter((row) => row.year === request.timeRange.endYear);
+  const selectedYearDisplayRows = displayRows.filter(
+    (row) => row.year === request.timeRange.endYear,
+  );
   const usOverallValue = buildAggregateValue(
     metric.id,
     selectedYearRows.map((row) => ({
@@ -298,6 +298,90 @@ export async function buildPceLevelResponse(
     populationRows,
   );
   const categoryLabel = getCategoryLabel(metric, categoryId);
+  const hasMultipleYears = request.timeRange.startYear !== request.timeRange.endYear;
+  const supportedCharts = hasMultipleYears
+    ? (["table", "line", "multi_line"] as const)
+    : (["table", "bar", "map"] as const);
+  const outputRows = hasMultipleYears
+    ? displayRows
+        .filter((row) => selectedStates.has(row.stateAbbrev))
+        .map((row) => ({
+          stateAbbrev: row.stateAbbrev,
+          stateName: row.stateName,
+          year: row.year,
+          value: row.value,
+          population: row.population,
+        }))
+    : selectedYearDisplayRows.map((row) => ({
+        stateAbbrev: row.stateAbbrev,
+        stateName: row.stateName,
+        year: row.year,
+        value: row.value,
+        population: row.population,
+      }));
+  const groupedRows = new Map<string, typeof outputRows>();
+
+  for (const row of outputRows) {
+    const existing = groupedRows.get(row.stateAbbrev) ?? [];
+    existing.push(row);
+    groupedRows.set(row.stateAbbrev, existing);
+  }
+
+  for (const seriesRows of groupedRows.values()) {
+    seriesRows.sort((left, right) => left.year - right.year);
+  }
+
+  const outputSeries = hasMultipleYears
+    ? Array.from(groupedRows.entries()).map(([stateAbbrev, rows]) => ({
+        key: stateAbbrev,
+        label: rows[0]?.stateName ?? stateAbbrev,
+        unit: metric.unit,
+        geography: stateAbbrev,
+        points: rows.map((row) => ({
+          x: row.year,
+          y: row.value,
+        })),
+      }))
+    : [
+        {
+          key: metric.id,
+          label: `${metric.displayName} (${categoryLabel})`,
+          unit: metric.unit,
+          points: selectedYearDisplayRows.map((row) => ({
+            x: row.stateAbbrev,
+            y: row.value,
+          })),
+        },
+      ];
+  const aggregates = [];
+
+  if (request.options.includeUsAggregate && request.options.aggregation !== "selected_only") {
+    aggregates.push({
+      id: "us-overall",
+      label: "US overall",
+      value: usOverallValue,
+      formattedValue: formatMetricValue(metric.id, usOverallValue),
+      unit: metric.unit,
+      context: `Derived from all available states for ${request.timeRange.endYear}.`,
+    });
+  }
+
+  if (
+    request.options.includeSelectedAggregate &&
+    request.options.aggregation !== "us_only"
+  ) {
+    aggregates.push({
+      id: "selected-states",
+      label: "Selected states aggregate",
+      value: selectedAggregateValue,
+      formattedValue: formatMetricValue(metric.id, selectedAggregateValue),
+      unit: metric.unit,
+      context:
+        selectedStates.size > 0
+          ? `${selectedStates.size} selected geographies.`
+          : "No states selected.",
+    });
+  }
 
   return {
     requestEcho: request,
@@ -308,57 +392,32 @@ export async function buildPceLevelResponse(
       { key: "value", label: metric.displayName, type: "number" },
       { key: "population", label: "Population", type: "number" },
     ],
-    rows: displayRows.map((row) => ({
-      stateAbbrev: row.stateAbbrev,
-      stateName: row.stateName,
-      year: row.year,
-      value: row.value,
-      population: row.population,
-    })),
-    series: [
-      {
-        key: metric.id,
-        label: `${metric.displayName} (${categoryLabel})`,
-        unit: metric.unit,
-        points: displayRows.map((row) => ({
-          x: row.stateAbbrev,
-          y: row.value,
-        })),
-      },
-    ],
-    aggregates: [
-      {
-        id: "us-overall",
-        label: "US overall",
-        value: usOverallValue,
-        formattedValue: formatMetricValue(metric.id, usOverallValue),
-        unit: metric.unit,
-        context: `Derived from all available states for ${request.timeRange.endYear}.`,
-      },
-      {
-        id: "selected-states",
-        label: "Selected states aggregate",
-        value: selectedAggregateValue,
-        formattedValue: formatMetricValue(metric.id, selectedAggregateValue),
-        unit: metric.unit,
-        context:
-          selectedStates.size > 0
-            ? `${selectedStates.size} selected geographies.`
-            : "No states selected.",
-      },
-    ],
+    rows: outputRows,
+    series: outputSeries,
+    aggregates,
     display: {
-      title: `${metric.displayName} map`,
-      subtitle: `${categoryLabel} for ${request.timeRange.endYear}. Click states to update the selected aggregate.`,
-      recommendedChart: request.view === "auto" ? "map" : request.view,
-      supportedCharts: metric.allowedChartTypes,
+      title: hasMultipleYears
+        ? `${metric.displayName} over time`
+        : `${metric.displayName} map`,
+      subtitle: hasMultipleYears
+        ? `${categoryLabel} from ${request.timeRange.startYear} to ${request.timeRange.endYear}.`
+        : `${categoryLabel} for ${request.timeRange.endYear}. Click states to update the selected aggregate.`,
+      recommendedChart:
+        request.view === "auto"
+          ? hasMultipleYears
+            ? selectedStates.size > 1
+              ? "multi_line"
+              : "line"
+            : "map"
+          : request.view,
+      supportedCharts: [...supportedCharts],
       unitLabel: metric.unit,
       metricFamily: metric.family,
       notes: metric.caveats,
     },
     warnings: [],
     emptyStateReason:
-      displayRows.length === 0 ? "No state rows matched the requested year." : null,
+      outputRows.length === 0 ? "No state rows matched the requested filters." : null,
   };
 }
 

@@ -83,4 +83,13 @@ describe("export service", () => {
     expect(typeof body).toBe("string");
     expect(body).toContain("stateAbbrev,year,value");
   });
+
+  it("builds xlsx output", async () => {
+    const { body } = await buildExportFile({
+      ...request,
+      format: "xlsx",
+    });
+
+    expect(body).toBeInstanceOf(Uint8Array);
+  });
 });

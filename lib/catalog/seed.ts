@@ -1,81 +1,363 @@
 import type { MetricCatalogEntry } from "@/lib/catalog/types";
 
+const pceCategoryDimension = {
+  key: "category" as const,
+  label: "PCE category",
+  defaultOptionId: "all",
+  options: [
+    { id: "all", label: "All PCE" },
+    {
+      id: "food",
+      label: "Food",
+      description: "Food and beverages purchased for off-premises consumption.",
+    },
+    { id: "gas", label: "Gas", description: "Gasoline and other energy goods." },
+    { id: "housing", label: "Housing", description: "Housing and utilities." },
+    { id: "health", label: "Health", description: "Health care." },
+    {
+      id: "food_services",
+      label: "Food services",
+      description: "Food services and accommodations.",
+    },
+  ],
+};
+
 export const metricCatalogSeed: MetricCatalogEntry[] = [
   {
-    id: "real-gdp",
-    displayName: "Real GDP",
-    shortDescription: "Inflation-adjusted gross domestic product.",
+    id: "pce-total",
+    family: "pce-levels",
+    displayName: "PCE Total",
+    shortDescription:
+      "Annual personal consumption expenditures for a selected state and category.",
     definition:
-      "Measures the inflation-adjusted value of goods and services produced in an economy over a period of time.",
-    unit: "Billions of chained dollars",
+      "Measures nominal personal consumption expenditures from BEA state PCE tables. The app can aggregate selected states into a live combined total.",
+    unit: "Dollars",
     source: {
       id: "bea",
       name: "Bureau of Economic Analysis",
-      url: "https://www.bea.gov/",
+      url: "https://www.bea.gov/data/consumer-spending/main",
     },
     caveats: [
-      "National aggregate only in the initial Phase 0 seed.",
-      "Later phases should map this semantic metric to serving-layer query logic.",
+      "The current serving layer exposes annual state data only.",
+      "US overall is derived by summing the available state series because the serving layer does not expose a separate national row here.",
     ],
-    aliases: ["gdp", "gross domestic product", "output"],
-    allowedGeographies: ["nation"],
+    aliases: ["pce", "personal consumption expenditures", "consumer spending"],
+    allowedGeographies: ["state"],
     timeCoverage: {
       startYear: 2000,
-      endYear: 2024,
-    },
-    allowedChartTypes: ["table", "line"],
-    category: "Growth",
-    freshness: "Quarterly source refresh",
-  },
-  {
-    id: "unemployment-rate",
-    displayName: "Unemployment Rate",
-    shortDescription: "Share of the labor force that is unemployed.",
-    definition:
-      "Represents the percentage of the civilian labor force that is unemployed and actively seeking work.",
-    unit: "Percent",
-    source: {
-      id: "bls",
-      name: "Bureau of Labor Statistics",
-      url: "https://www.bls.gov/",
-    },
-    caveats: [
-      "State comparisons can be noisy over short time windows.",
-      "Seasonal adjustment details should remain visible in future metadata panels.",
-    ],
-    aliases: ["jobless rate", "labor market", "unemployment"],
-    allowedGeographies: ["nation", "state"],
-    timeCoverage: {
-      startYear: 2005,
       endYear: 2024,
     },
     allowedChartTypes: ["table", "bar", "line", "multi_line", "map"],
-    category: "Labor",
-    freshness: "Monthly source refresh",
+    category: "Spending",
+    freshness: "Annual BEA refresh",
+    status: "live",
+    dimensions: [pceCategoryDimension],
+    derivation: {
+      kind: "raw",
+      description: "Direct nominal annual PCE levels from BEA SAPCE1 state rows.",
+    },
+    backing: {
+      datasetId: "pce_state_sapce1",
+      beaTableName: "SAPCE1",
+      lineCodeByDimensionOptionId: {
+        all: "1",
+        food: "9",
+        gas: "11",
+        housing: "15",
+        health: "16",
+        food_services: "19",
+      },
+    },
   },
   {
-    id: "cpi",
-    displayName: "Consumer Price Index",
-    shortDescription: "Broad measure of consumer price inflation.",
+    id: "pce-per-capita",
+    family: "pce-levels",
+    displayName: "PCE Per Capita",
+    shortDescription:
+      "Annual personal consumption expenditures per resident for a selected state and category.",
     definition:
-      "Tracks average change over time in the prices paid by urban consumers for a market basket of goods and services.",
-    unit: "Index",
+      "Divides nominal state PCE by resident population from Census. Selected-state aggregates use summed spending divided by summed population.",
+    unit: "Dollars per person",
     source: {
-      id: "bls",
-      name: "Bureau of Labor Statistics",
-      url: "https://www.bls.gov/cpi/",
+      id: "bea-census",
+      name: "BEA and Census",
+      url: "https://www.bea.gov/data/consumer-spending/main",
     },
     caveats: [
-      "Index levels are not directly comparable to growth rates without transformation.",
+      "Per-capita values are derived in the app from raw PCE and resident population to avoid duplicate rows in the current serving-layer convenience view.",
     ],
-    aliases: ["inflation", "prices", "consumer prices"],
-    allowedGeographies: ["nation"],
+    aliases: ["pce per capita", "spending per person", "consumer spending per resident"],
+    allowedGeographies: ["state"],
     timeCoverage: {
       startYear: 2000,
       endYear: 2024,
     },
-    allowedChartTypes: ["table", "line"],
+    allowedChartTypes: ["table", "bar", "line", "multi_line", "map"],
+    category: "Spending",
+    freshness: "Annual BEA and Census refresh",
+    status: "live",
+    dimensions: [pceCategoryDimension],
+    derivation: {
+      kind: "per_capita",
+      description: "Nominal PCE divided by resident population.",
+      dependsOnMetricIds: ["pce-total"],
+    },
+    backing: {
+      datasetId: "pce_state_sapce1",
+      beaTableName: "SAPCE1",
+      lineCodeByDimensionOptionId: {
+        all: "1",
+        food: "9",
+        gas: "11",
+        housing: "15",
+        health: "16",
+        food_services: "19",
+      },
+      notes: ["Population is sourced from census_state_population resident population rows."],
+    },
+  },
+  {
+    id: "pce-inflation-yoy",
+    family: "pce-inflation",
+    displayName: "PCE Inflation",
+    shortDescription:
+      "Year-over-year change in an implicit state PCE price index built from nominal and real PCE.",
+    definition:
+      "Builds an implicit PCE price index from nominal total PCE and real total PCE, then computes year-over-year change. This is available only for all-items PCE in the current serving layer.",
+    unit: "Percent",
+    source: {
+      id: "bea",
+      name: "Bureau of Economic Analysis",
+      url: "https://www.bea.gov/data/consumer-spending/main",
+    },
+    caveats: [
+      "Category-specific state PCE price indexes are not currently available in the serving layer.",
+      "The current implementation therefore exposes true inflation only for all-items PCE.",
+    ],
+    aliases: ["pce inflation", "implicit pce inflation", "price growth"],
+    allowedGeographies: ["state"],
+    timeCoverage: {
+      startYear: 2001,
+      endYear: 2024,
+    },
+    allowedChartTypes: ["table", "line", "multi_line"],
     category: "Prices",
-    freshness: "Monthly source refresh",
+    freshness: "Annual BEA refresh",
+    status: "partial",
+    dimensions: [
+      {
+        key: "category",
+        label: "PCE category",
+        defaultOptionId: "all",
+        options: [{ id: "all", label: "All PCE" }],
+      },
+      {
+        key: "transform",
+        label: "Transformation",
+        defaultOptionId: "yoy",
+        options: [{ id: "yoy", label: "Year over year" }],
+      },
+    ],
+    derivation: {
+      kind: "implicit_price_index",
+      description: "Nominal total PCE divided by real total PCE, then transformed into year-over-year percent change.",
+    },
+    backing: {
+      datasetId: "state_real_income_and_pce_sarpi",
+      beaTableName: "SARPI",
+      notes: [
+        "Uses SARPI line 3 for real PCE and SAPCE1 line 1 for nominal total PCE.",
+      ],
+    },
+  },
+  {
+    id: "pce-growth-yoy",
+    family: "pce-growth",
+    displayName: "PCE Growth",
+    shortDescription:
+      "Year-over-year change in nominal state PCE levels for the selected category.",
+    definition:
+      "Tracks year-over-year growth in nominal personal consumption expenditures. This is useful for category storytelling when a true state-category price index is unavailable.",
+    unit: "Percent",
+    source: {
+      id: "bea",
+      name: "Bureau of Economic Analysis",
+      url: "https://www.bea.gov/data/consumer-spending/main",
+    },
+    caveats: [
+      "This is nominal spending growth, not a pure price inflation measure.",
+      "Use the all-items PCE inflation metric when you need a state-level price series rather than spending growth.",
+    ],
+    aliases: ["pce yoy growth", "spending growth", "food price story"],
+    allowedGeographies: ["state"],
+    timeCoverage: {
+      startYear: 2001,
+      endYear: 2024,
+    },
+    allowedChartTypes: ["table", "line", "multi_line"],
+    category: "Spending",
+    freshness: "Annual BEA refresh",
+    status: "live",
+    dimensions: [pceCategoryDimension],
+    derivation: {
+      kind: "yoy",
+      description: "Year-over-year percent change in nominal PCE levels from BEA SAPCE1 rows.",
+      dependsOnMetricIds: ["pce-total"],
+    },
+    backing: {
+      viewName: "v_macro_yoy",
+      beaTableName: "SAPCE1",
+      lineCodeByDimensionOptionId: {
+        all: "1",
+        food: "9",
+        gas: "11",
+        housing: "15",
+        health: "16",
+        food_services: "19",
+      },
+    },
+  },
+  {
+    id: "federal-direct-transfers",
+    family: "federal-inflows",
+    displayName: "Federal Direct Transfers",
+    shortDescription:
+      "Annual federal current transfer receipts to persons for each state.",
+    definition:
+      "Tracks federal transfer receipts flowing to people in a state and supports comparison against state GDP.",
+    unit: "Dollars",
+    source: {
+      id: "bea",
+      name: "Bureau of Economic Analysis",
+      url: "https://www.bea.gov/data/income-saving/personal-income-by-state",
+    },
+    caveats: [
+      "This metric covers direct transfers to persons, not state-government program funding.",
+    ],
+    aliases: ["federal transfers", "federal money to persons", "transfers to people"],
+    allowedGeographies: ["state"],
+    timeCoverage: {
+      startYear: 2000,
+      endYear: 2024,
+    },
+    allowedChartTypes: ["table", "bar", "map"],
+    category: "Federal flows",
+    freshness: "Annual BEA refresh",
+    status: "live",
+    derivation: {
+      kind: "raw",
+      description: "Direct receipts from the serving federal-to-persons view.",
+    },
+    backing: {
+      viewName: "v_state_federal_to_persons_gdp_annual",
+    },
+  },
+  {
+    id: "federal-program-funding",
+    family: "federal-inflows",
+    displayName: "Federal Program Funding",
+    shortDescription:
+      "Annual federal intergovernmental revenue flowing to state governments.",
+    definition:
+      "Tracks federal funding to state and local public programs using Census state government finance data joined to GDP.",
+    unit: "Dollars",
+    source: {
+      id: "census",
+      name: "Census State Government Finance",
+      url: "https://www.census.gov/programs-surveys/gov-finances.html",
+    },
+    caveats: [
+      "Coverage currently starts in 2012 and excludes DC in the serving layer.",
+    ],
+    aliases: ["state program funding", "federal grants", "state government funding"],
+    allowedGeographies: ["state"],
+    timeCoverage: {
+      startYear: 2012,
+      endYear: 2023,
+    },
+    allowedChartTypes: ["table", "bar", "map"],
+    category: "Federal flows",
+    freshness: "Annual Census refresh",
+    status: "live",
+    derivation: {
+      kind: "raw",
+      description: "Direct receipts from the serving federal-to-state-government view.",
+    },
+    backing: {
+      viewName: "v_state_federal_to_stategov_gdp_annual",
+    },
+  },
+  {
+    id: "federal-total-inflows",
+    family: "federal-inflows",
+    displayName: "Federal Total Inflows",
+    shortDescription:
+      "Combined direct transfers to persons and federal program funding flowing into a state.",
+    definition:
+      "Adds direct federal transfers to persons and federal intergovernmental program funding to provide a combined federal inflow figure.",
+    unit: "Dollars",
+    source: {
+      id: "bea-census",
+      name: "BEA and Census",
+    },
+    caveats: [
+      "Combined inflows inherit the narrower year coverage of the program-funding series.",
+    ],
+    aliases: ["total federal money", "combined federal inflows", "all federal inflows"],
+    allowedGeographies: ["state"],
+    timeCoverage: {
+      startYear: 2012,
+      endYear: 2023,
+    },
+    allowedChartTypes: ["table", "bar", "map"],
+    category: "Federal flows",
+    freshness: "Annual combined refresh",
+    status: "live",
+    derivation: {
+      kind: "sum",
+      description: "Sum of federal direct transfers and federal program funding.",
+      dependsOnMetricIds: [
+        "federal-direct-transfers",
+        "federal-program-funding",
+      ],
+    },
+  },
+  {
+    id: "state-gdp",
+    family: "gdp",
+    displayName: "State GDP",
+    shortDescription: "Annual current-dollar gross domestic product by state.",
+    definition:
+      "Measures the annual current-dollar value of economic output for a state and provides the denominator for inflow-to-GDP comparisons.",
+    unit: "Dollars",
+    source: {
+      id: "bea",
+      name: "Bureau of Economic Analysis",
+      url: "https://www.bea.gov/data/gdp/gdp-state",
+    },
+    caveats: [
+      "This metric uses current-dollar GDP to keep the comparison aligned with current-dollar federal inflows.",
+    ],
+    aliases: ["gdp", "state output", "economic contribution"],
+    allowedGeographies: ["state"],
+    timeCoverage: {
+      startYear: 2000,
+      endYear: 2024,
+    },
+    allowedChartTypes: ["table", "bar", "map"],
+    category: "Growth",
+    freshness: "Annual BEA refresh",
+    status: "live",
+    derivation: {
+      kind: "raw",
+      description: "Direct current-dollar GDP rows from BEA state GDP data.",
+    },
+    backing: {
+      datasetId: "state_gdp_sagdp1",
+      beaTableName: "SAGDP1",
+      lineCodeByDimensionOptionId: {
+        all: "3",
+      },
+    },
   },
 ];

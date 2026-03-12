@@ -21,7 +21,7 @@ describe("contracts", () => {
   it("rejects invalid time ranges", () => {
     expect(() =>
       queryRequestSchema.parse({
-        metricIds: ["unemployment-rate"],
+        metricIds: ["pce-total"],
         geography: {
           level: "state",
           values: [],
@@ -38,7 +38,7 @@ describe("contracts", () => {
   it("accepts chart recommendation requests", () => {
     expect(
       chartRecommendationRequestSchema.parse({
-        metricIds: ["unemployment-rate"],
+        metricIds: ["pce-growth-yoy"],
         geography: {
           level: "state",
           values: ["CA"],
@@ -48,6 +48,10 @@ describe("contracts", () => {
           endYear: 2024,
         },
         view: "auto",
+        options: {
+          category: "food",
+          excludedGeographies: ["CA"],
+        },
       }).geography.level,
     ).toBe("state");
   });
@@ -55,16 +59,16 @@ describe("contracts", () => {
   it("accepts export requests for csv and xlsx", () => {
     expect(
       exportRequestSchema.parse({
-        metricIds: ["unemployment-rate"],
+        metricIds: ["federal-total-inflows", "state-gdp"],
         geography: {
-          level: "nation",
-          values: [],
+          level: "state",
+          values: ["CA"],
         },
         timeRange: {
-          startYear: 2024,
-          endYear: 2024,
+          startYear: 2023,
+          endYear: 2023,
         },
-        view: "table",
+        view: "bar",
         format: "xlsx",
       }).format,
     ).toBe("xlsx");

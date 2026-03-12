@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Macro Frontend",
+  title: "Macro Dashboard",
   description:
-    "Foundational Next.js app for a trustworthy self-serve macro dashboard.",
+    "State PCE, inflation, and federal-flow dashboard for self-serve macro analysis.",
 };
 
 export default function RootLayout({

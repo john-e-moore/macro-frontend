@@ -14,11 +14,11 @@ export async function POST(request: Request): Promise<Response> {
 
     if (request.headers.get("x-export-manifest-only") === "true") {
       return Response.json(
-        exportResponseSchema.parse(buildExportManifest(parsedRequest)),
+        exportResponseSchema.parse(await buildExportManifest(parsedRequest)),
       );
     }
 
-    const { manifest, body } = buildExportFile(parsedRequest);
+    const { manifest, body } = await buildExportFile(parsedRequest);
     const responseBody =
       typeof body === "string"
         ? body

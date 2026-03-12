@@ -14,11 +14,11 @@ The app should help non-technical users:
 
 ## Architecture
 
-Phase 0 establishes the repository shape and contract boundaries for later roadmap phases:
+Phase 1 builds on the completed foundation and now connects the semantic catalog to live serving-layer queries:
 
 - `app/`: App Router pages and route handlers.
 - `app/api/`: validated server-side endpoints for search, metadata lookup, queries, chart recommendation, and export.
-- `components/`: reusable UI building blocks and foundation shell components.
+- `components/`: reusable UI building blocks for the dashboard, charts, and state map.
 - `lib/catalog/`: semantic metric catalog types, seed data, and helpers.
 - `lib/contracts/`: stable request and response contracts shared by route handlers and callers.
 - `lib/db/`: server-only database access utilities using a read-only Postgres user.
@@ -67,20 +67,26 @@ npm run typecheck
 npm run test
 ```
 
-If real database credentials are unavailable, Phase 0 tests still run because the current API surface is backed by typed contracts and lightweight seed data.
+If real database credentials are unavailable, catalog and contract tests still run. Live query behavior depends on the read-only Postgres connection described above.
 
-## Current Phase 0 Surface
+## Current Phase 1 Surface
 
-Phase 0 intentionally provides a real foundation without completing the full Phase 1 user workflow:
+The app now ships three serving-backed workflows:
 
-- product-aware landing page shell,
-- semantic metric catalog model and helpers,
-- server-only database configuration and pool factory,
-- validated API contracts for search, metadata, query, chart recommendation, and export,
+- state PCE maps with total/per-capita toggles and category filters,
+- selected-state aggregate recomputation alongside derived US overall values,
+- PCE trend storytelling with all-items implicit inflation and category-level nominal growth,
+- federal direct-transfer and program-funding comparisons against state GDP,
 - CSV and XLSX export generation from the shared query result shape.
+
+## Data Notes
+
+- State PCE levels currently use annual BEA SAPCE1 state data.
+- Per-capita PCE is derived in the app from raw PCE plus resident population because the current serving convenience view duplicates Census rows.
+- True state-category PCE price indexes are not available in the current serving layer, so category trend stories use nominal PCE growth. All-items implicit PCE inflation is still available via nominal versus real PCE.
 
 ## Planning And PRs
 
-- The active implementation plan for this phase lives in `.cursor/plans/phase-0_foundations_658d864f.plan.md`.
+- The active implementation plan for this phase lives in `.cursor/plans/metrics_phase_one_a0753413.plan.md`.
 - Cross-cutting work should also be tracked in `.agent/PLANS.md`.
 - Substantial pull requests should follow `.agent/PR_TEMPLATE.md`, including a `.cursor/` plan reference when one exists.

@@ -57,6 +57,8 @@ export function validationErrorResponse(error: unknown): Response {
     );
   }
 
+  console.error(error);
+
   return Response.json(
     {
       error: "Unexpected server error.",

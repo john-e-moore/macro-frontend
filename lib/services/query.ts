@@ -1,19 +1,16 @@
-import { getMetricsByIds } from "@/lib/catalog";
+import { getMetricById, getMetricsByIds } from "@/lib/catalog";
 import type { QueryRequest, QueryResponse } from "@/lib/contracts/query";
 import { getChartRecommendation } from "@/lib/services/chart-recommendation";
+import { buildFederalComparisonResponse, isFederalMetricSet } from "@/lib/services/federal-metrics";
+import {
+  buildPceGrowthResponse,
+  buildPceInflationResponse,
+  buildPceLevelResponse,
+  isPceMetric,
+} from "@/lib/services/pce-metrics";
 import { RequestValidationError } from "@/lib/validation/request";
 
-function toGeographyValues(request: QueryRequest): string[] {
-  if (request.geography.values.length > 0) {
-    return request.geography.values;
-  }
-
-  return request.geography.level === "state"
-    ? ["CA", "TX", "NY"]
-    : ["United States"];
-}
-
-export function runQuery(request: QueryRequest): QueryResponse {
+export async function runQuery(request: QueryRequest): Promise<QueryResponse> {
   const metrics = getMetricsByIds(request.metricIds);
 
   if (metrics.length !== request.metricIds.length) {
@@ -22,53 +19,38 @@ export function runQuery(request: QueryRequest): QueryResponse {
     });
   }
 
-  const geographyValues = toGeographyValues(request);
-  const limitedYears = Array.from(
-    { length: Math.min(request.timeRange.endYear - request.timeRange.startYear + 1, 3) },
-    (_, index) => request.timeRange.startYear + index,
-  );
-  const rows = geographyValues.flatMap((geographyValue, geographyIndex) =>
-    limitedYears.map((year, yearIndex) => {
-      const row: Record<string, string | number | null> = {
-        geography: geographyValue,
-        year,
-      };
+  if (request.metricIds.length === 1 && isPceMetric(request.metricIds[0])) {
+    const metric = getMetricById(request.metricIds[0]);
 
-      for (const [metricIndex, metric] of metrics.entries()) {
-        row[metric.id] = Number(
-          (100 + geographyIndex * 7 + yearIndex * 3 + metricIndex * 11).toFixed(
-            2,
-          ),
-        );
-      }
+    if (!metric) {
+      throw new RequestValidationError("Unknown metric.", {
+        metricIds: request.metricIds,
+      });
+    }
 
-      return row;
-    }),
-  );
+    if (metric.id === "pce-total" || metric.id === "pce-per-capita") {
+      return buildPceLevelResponse(metric, request);
+    }
+
+    if (metric.id === "pce-growth-yoy") {
+      return buildPceGrowthResponse(metric, request);
+    }
+
+    if (metric.id === "pce-inflation-yoy") {
+      return buildPceInflationResponse(metric, request);
+    }
+  }
+
+  if (isFederalMetricSet(request.metricIds)) {
+    return buildFederalComparisonResponse(request);
+  }
 
   const recommendation = getChartRecommendation(request);
-
-  return {
-    requestEcho: request,
-    columns: [
-      { key: "geography", label: "Geography", type: "string" },
-      { key: "year", label: "Year", type: "number" },
-      ...metrics.map((metric) => ({
-        key: metric.id,
-        label: metric.displayName,
-        type: "number" as const,
-      })),
-    ],
-    rows,
-    display: {
-      title: metrics.map((metric) => metric.displayName).join(", "),
-      subtitle: `Sample Phase 0 response for ${request.geography.level} coverage from ${request.timeRange.startYear} to ${request.timeRange.endYear}.`,
-      recommendedChart: recommendation.recommendedView,
-      supportedCharts: recommendation.supportedViews,
+  throw new RequestValidationError(
+    "The selected metric combination does not have a live Phase 1 query implementation yet.",
+    {
+      metricIds: request.metricIds,
+      recommendedView: recommendation.recommendedView,
     },
-    warnings: [
-      "Phase 0 responses are contract-first samples until live serving-layer queries are connected.",
-    ],
-    emptyStateReason: rows.length === 0 ? "No rows matched the requested filters." : null,
-  };
+  );
 }

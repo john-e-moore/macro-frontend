@@ -8,21 +8,31 @@ import { RequestValidationError } from "@/lib/validation/request";
 
 function recommendChart(request: ChartRecommendationRequest): ChartType {
   const yearSpan = request.timeRange.endYear - request.timeRange.startYear;
+  const metricIds = new Set(request.metricIds);
 
   if (request.view !== "auto") {
     return request.view;
   }
 
-  if (request.geography.level === "state" && yearSpan === 0) {
+  if (metricIds.has("pce-total") || metricIds.has("pce-per-capita")) {
     return "map";
+  }
+
+  if (metricIds.has("pce-inflation-yoy") || metricIds.has("pce-growth-yoy")) {
+    return "multi_line";
+  }
+
+  if (
+    metricIds.has("federal-direct-transfers") ||
+    metricIds.has("federal-program-funding") ||
+    metricIds.has("federal-total-inflows") ||
+    metricIds.has("state-gdp")
+  ) {
+    return "bar";
   }
 
   if (request.geography.level === "state" && yearSpan > 0) {
     return "multi_line";
-  }
-
-  if (request.geography.level === "nation" && yearSpan > 0) {
-    return "line";
   }
 
   return "table";
@@ -50,6 +60,6 @@ export function getChartRecommendation(
       : supportedViews[0] ?? "table",
     supportedViews,
     reason:
-      "Phase 0 uses a lightweight heuristic based on geography coverage, time span, and the selected metric set.",
+      "Phase 1 recommends charts from the selected metric family, geography coverage, and time span.",
   };
 }

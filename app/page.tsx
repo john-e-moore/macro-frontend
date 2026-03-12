@@ -1,5 +1,7 @@
-import { MetricsDashboard } from "@/components/metrics-dashboard";
+import { listMetrics } from "@/lib/catalog";
+
+import { LandingPage } from "@/components/landing-page";
 
 export default function Home() {
-  return <MetricsDashboard />;
+  return <LandingPage metrics={listMetrics()} />;
 }

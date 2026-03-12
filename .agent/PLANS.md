@@ -178,6 +178,7 @@ Name endpoints, libraries, modules, third-party services, and any required inter
 Use this section to track in-flight plans:
 
 - `2026-03-12 - Phase 0 Foundations - status: in_progress - owner: Cursor agent`
+- `2026-03-12 - Phase 1 MVP - status: completed - owner: Cursor agent`
 
 ---
 
@@ -300,3 +301,123 @@ Expected outcomes:
   - `POST /api/query`
   - `POST /api/chart-recommendation`
   - `POST /api/export`
+
+---
+
+# Phase 1 MVP
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+## Purpose / Big Picture
+
+Turn the current single-page demo into the Phase 1 MVP product flow from `.agent/ROADMAP.md`: a landing page with guided entry points, a catalog for metric discovery and metadata, and an explorer for URL-backed query building, chart/table inspection, and exact-result export.
+
+## Links
+
+- Branch: `feature/phase-1-mvp`
+- Feature brief: `N/A`
+- PR: `pending`
+- `.cursor` plan: `.cursor/plans/phase_1_mvp_07bff4ef.plan.md`
+
+## Progress
+
+- [x] (2026-03-12 00:00Z) Initial planning completed in `.cursor/plans/phase_1_mvp_07bff4ef.plan.md`.
+- [x] Landing, catalog, metadata panel, and explorer UI routes implemented.
+- [x] Validation and final documentation updates completed.
+
+## Surprises & Discoveries
+
+- Observation: The repository already had live serving-backed query services, but the user-facing product surface was still a single hard-coded dashboard.
+  Evidence: `app/page.tsx` only rendered `components/metrics-dashboard.tsx`.
+- Observation: PCE level responses needed a small service upgrade to support meaningful line views for multi-year ranges.
+  Evidence: The original `buildPceLevelResponse()` only emitted selected-year rows and map-oriented series.
+
+## Decision Log
+
+- Decision: Split the MVP into `/`, `/catalog`, and `/explore` instead of keeping the current single-route dashboard.
+  Rationale: This matches the repository spec's required surfaces and creates a discovery-first workflow without discarding the live query layer.
+  Date/Author: 2026-03-12, Cursor agent
+- Decision: Keep the current metric services and wrap them in a generic explorer state model rather than redesigning the backend contract first.
+  Rationale: The existing validated API surface was already strong enough to support the MVP if the UI state and view logic were normalized around it.
+  Date/Author: 2026-03-12, Cursor agent
+
+## Outcomes & Retrospective
+
+Phase 1 MVP now exposes a product-shaped flow:
+
+- a landing page with guided paths,
+- a searchable catalog with reusable metadata inspection,
+- a URL-backed explorer with chart/table switching,
+- CSV and XLSX export actions from the same query payload used for rendering.
+
+Validation is complete for the local repo checks that do not require live browser verification or production credentials.
+
+## Context and Orientation
+
+- `app/page.tsx` is now the landing page entry point.
+- `app/catalog/page.tsx` renders metric discovery and metadata inspection.
+- `app/explore/page.tsx` parses URL state and hands off to the client explorer.
+- `components/landing-page.tsx`, `components/metric-catalog.tsx`, `components/query-builder.tsx`, `components/result-surface.tsx`, and `components/metadata-panel.tsx` make up the new product surface.
+- `lib/explore-state.ts` is the shared URL/query-state adapter between the explorer UI and the validated query contract.
+- `lib/services/pce-metrics.ts` now supports both single-year map/bar style output and multi-year line output for PCE levels.
+
+## Plan of Work
+
+1. Replace the home page with a true landing surface and add shared navigation.
+2. Add catalog and explorer routes that reuse the existing semantic catalog and metric metadata.
+3. Introduce reusable metadata, builder, and result-surface components instead of keeping one monolithic dashboard component.
+4. Add URL-state parsing and serialization utilities so explorer filters survive refresh and direct linking.
+5. Upgrade the PCE level service where needed so supported views align with the explorer UI.
+6. Update docs and tests to match the new MVP workflow.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-frontend
+    npm run lint
+    npm run typecheck
+    npm run test
+
+Expected outcomes:
+
+- lint passes for the new routes, components, and utilities,
+- typecheck passes across the new explorer state and route props,
+- tests cover catalog helpers, explorer URL state, and export generation.
+
+## Validation and Acceptance
+
+- A user can land on `/` and choose to browse metrics or open the explorer.
+- A user can search `/catalog`, browse by category, and inspect metric metadata.
+- A user can open `/explore`, change filters, refresh the page, and retain the same state from the URL.
+- The explorer can render supported results as table, bar, line, multi-line, or map depending on the selected metric and time span.
+- CSV and XLSX exports are both available from the result surface and use the current query payload.
+- Empty, loading, and error states render clearly when no result or a request failure occurs.
+
+## Risks and Recovery
+
+- Risk: The generic explorer can expose metric/view combinations that the current live services only partially support.
+  Recovery: Clamp available views in `lib/explore-state.ts` and keep service-level responses aligned with those view options.
+- Risk: URL-state churn can create noisy router updates.
+  Recovery: Keep the serialized parameter set small and normalize state before writing it back to the URL.
+- Risk: The old `components/metrics-dashboard.tsx` remains in the repo and can drift stale.
+  Recovery: Either remove it in a later cleanup or treat it as deprecated and avoid routing to it.
+
+## Artifacts and Notes
+
+- Plan file: `.cursor/plans/phase_1_mvp_07bff4ef.plan.md`
+- New MVP routes: `app/page.tsx`, `app/catalog/page.tsx`, `app/explore/page.tsx`
+- Shared state adapter: `lib/explore-state.ts`
+- Validation:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test`
+
+## Interfaces and Dependencies
+
+- Dependencies: `next`, `react`, `zod`, `pg`, `server-only`, `xlsx`, `vitest`
+- Existing API endpoints reused by the MVP:
+  - `GET /api/metrics/search`
+  - `GET /api/metrics/[metricId]`
+  - `POST /api/query`
+  - `POST /api/chart-recommendation`
+  - `POST /api/export`
+- Shared UI-to-data interface: `lib/contracts/query.ts`

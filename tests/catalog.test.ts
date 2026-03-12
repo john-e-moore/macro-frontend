@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   getMetricById,
+  listMetricCategories,
   listMetrics,
   searchMetrics,
 } from "@/lib/catalog";
@@ -19,5 +20,10 @@ describe("metric catalog", () => {
     const results = searchMetrics("inflation");
 
     expect(results.map((metric) => metric.id)).toContain("pce-inflation-yoy");
+  });
+
+  it("lists unique metric categories", () => {
+    expect(listMetricCategories()).toContain("Spending");
+    expect(listMetricCategories()).toContain("Federal flows");
   });
 });

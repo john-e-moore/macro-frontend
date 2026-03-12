@@ -33,6 +33,16 @@ export function listMetrics(): MetricCatalogSummary[] {
   return metricCatalogSeed.map(toSummary);
 }
 
+export function listMetricEntries(): MetricCatalogEntry[] {
+  return metricCatalogSeed;
+}
+
+export function listMetricCategories(): string[] {
+  return Array.from(new Set(metricCatalogSeed.map((metric) => metric.category))).sort(
+    (left, right) => left.localeCompare(right),
+  );
+}
+
 export function getMetricById(metricId: string): MetricCatalogEntry | null {
   return metricCatalogById.get(metricId) ?? null;
 }

@@ -1,5 +1,5 @@
-import { FoundationShell } from "@/components/foundation-shell";
+import { MetricsDashboard } from "@/components/metrics-dashboard";
 
 export default function Home() {
-  return <FoundationShell />;
+  return <MetricsDashboard />;
 }

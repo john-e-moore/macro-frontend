@@ -11,11 +11,13 @@ const metricCatalogById = new Map(
 function toSummary(metric: MetricCatalogEntry): MetricCatalogSummary {
   return {
     id: metric.id,
+    family: metric.family,
     displayName: metric.displayName,
     shortDescription: metric.shortDescription,
     category: metric.category,
     allowedChartTypes: metric.allowedChartTypes,
     unit: metric.unit,
+    status: metric.status,
   };
 }
 
@@ -46,6 +48,7 @@ export function searchMetrics(query: string): MetricCatalogSummary[] {
     .filter((metric) => {
       const haystack = [
         metric.id,
+        metric.family,
         metric.displayName,
         metric.shortDescription,
         metric.definition,
@@ -53,6 +56,13 @@ export function searchMetrics(query: string): MetricCatalogSummary[] {
         metric.unit,
         ...metric.aliases,
         ...metric.caveats,
+        ...(metric.dimensions ?? []).flatMap((dimension) =>
+          dimension.options.flatMap((option) => [
+            option.id,
+            option.label,
+            option.description ?? "",
+          ]),
+        ),
       ]
         .join(" ")
         .toLowerCase();

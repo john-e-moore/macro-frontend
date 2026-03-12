@@ -6,8 +6,8 @@ import type {
 } from "@/lib/contracts/export";
 import { runQuery } from "@/lib/services/query";
 
-function buildExportRows(request: ExportRequest) {
-  const queryResponse = runQuery(request);
+async function buildExportRows(request: ExportRequest) {
+  const queryResponse = await runQuery(request);
 
   return {
     rows: queryResponse.rows,
@@ -15,11 +15,11 @@ function buildExportRows(request: ExportRequest) {
   };
 }
 
-export function buildExportManifest(
+export async function buildExportManifest(
   request: ExportRequest,
-): ExportResponse {
+): Promise<ExportResponse> {
   const fileStem = `${request.metricIds.join("-")}-${request.geography.level}-${request.timeRange.startYear}-${request.timeRange.endYear}`;
-  const { rows } = buildExportRows(request);
+  const { rows } = await buildExportRows(request);
 
   return {
     fileName: `${fileStem}.${request.format}`,
@@ -32,11 +32,11 @@ export function buildExportManifest(
   };
 }
 
-export function buildExportFile(
+export async function buildExportFile(
   request: ExportRequest,
-): { manifest: ExportResponse; body: Uint8Array | string } {
-  const manifest = buildExportManifest(request);
-  const { rows } = buildExportRows(request);
+): Promise<{ manifest: ExportResponse; body: Uint8Array | string }> {
+  const manifest = await buildExportManifest(request);
+  const { rows } = await buildExportRows(request);
 
   if (request.format === "csv") {
     const worksheet = utils.json_to_sheet(rows);

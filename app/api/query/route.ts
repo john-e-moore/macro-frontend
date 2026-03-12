@@ -8,7 +8,7 @@ import {
 export async function POST(request: Request): Promise<Response> {
   try {
     const parsedRequest = await parseJsonRequest(queryRequestSchema, request);
-    const response = runQuery(parsedRequest);
+    const response = await runQuery(parsedRequest);
 
     return Response.json(queryResponseSchema.parse(response));
   } catch (error) {

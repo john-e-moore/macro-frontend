@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { z } from "zod";
 
 const optionalAppEnvSchema = z.object({
@@ -22,15 +25,55 @@ export type AppEnv = z.infer<typeof optionalAppEnvSchema>;
 export type DatabaseEnv = z.infer<typeof requiredDbEnvSchema>;
 type EnvSource = Record<string, string | undefined>;
 
+function readRawDotEnv(): EnvSource {
+  const dotEnvPath = join(process.cwd(), ".env");
+
+  if (!existsSync(dotEnvPath)) {
+    return {};
+  }
+
+  const entries = readFileSync(dotEnvPath, "utf8")
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .filter((line) => !line.trim().startsWith("#"))
+    .map((line) => {
+      const separatorIndex = line.indexOf("=");
+
+      if (separatorIndex === -1) {
+        return null;
+      }
+
+      return [
+        line.slice(0, separatorIndex),
+        line.slice(separatorIndex + 1),
+      ] as const;
+    })
+    .filter((entry): entry is readonly [string, string] => entry !== null);
+
+  return Object.fromEntries(entries);
+}
+
+function mergeEnvSource(source: EnvSource): EnvSource {
+  if (source !== process.env) {
+    return source;
+  }
+
+  return {
+    ...source,
+    ...readRawDotEnv(),
+  };
+}
+
 export function readAppEnv(source: EnvSource = process.env): AppEnv {
-  return optionalAppEnvSchema.parse(source);
+  return optionalAppEnvSchema.parse(mergeEnvSource(source));
 }
 
 export function readDatabaseEnv(
   source: EnvSource = process.env,
 ): DatabaseEnv & AppEnv {
-  const appEnv = readAppEnv(source);
-  const dbEnv = requiredDbEnvSchema.parse(source);
+  const mergedSource = mergeEnvSource(source);
+  const appEnv = readAppEnv(mergedSource);
+  const dbEnv = requiredDbEnvSchema.parse(mergedSource);
 
   return {
     ...appEnv,

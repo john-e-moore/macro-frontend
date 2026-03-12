@@ -10,7 +10,11 @@ function createPoolConfig(): PoolConfig {
   const env = readDatabaseEnv();
 
   return {
-    connectionString: env.PG_URL,
+    host: env.PG_HOST,
+    port: env.PG_PORT,
+    database: env.PG_DATABASE,
+    user: env.PG_USER,
+    password: env.PG_PASSWORD,
     max: 10,
     ssl: {
       rejectUnauthorized: false,

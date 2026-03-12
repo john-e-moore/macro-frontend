@@ -8,6 +8,7 @@ export const chartRecommendationRequestSchema = queryRequestSchema.pick({
   geography: true,
   timeRange: true,
   view: true,
+  options: true,
 });
 
 export const chartRecommendationResponseSchema = z.object({

@@ -7,17 +7,26 @@ import {
   parseSearchParams,
   validationErrorResponse,
 } from "@/lib/validation/request";
+import { buildRouteCacheHeaders, getCachedRouteValue } from "@/lib/route-cache";
 
-export function GET(request: Request): Response {
+export async function GET(request: Request): Promise<Response> {
   try {
     const { searchParams } = new URL(request.url);
     const parsedRequest = parseSearchParams(
       metricSearchRequestSchema,
       searchParams,
     );
-    const response = runMetricSearch(parsedRequest);
+    const ttlSeconds = 300;
+    const { value, cacheStatus } = await getCachedRouteValue({
+      scope: "metric-search",
+      key: JSON.stringify(parsedRequest),
+      ttlSeconds,
+      loader: () => runMetricSearch(parsedRequest),
+    });
 
-    return Response.json(metricSearchResponseSchema.parse(response));
+    return Response.json(metricSearchResponseSchema.parse(value), {
+      headers: buildRouteCacheHeaders({ ttlSeconds, cacheStatus }),
+    });
   } catch (error) {
     return validationErrorResponse(error);
   }

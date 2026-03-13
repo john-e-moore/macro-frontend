@@ -38,6 +38,8 @@ vi.mock("@/lib/services/query", () => ({
       title: "PCE Total map",
       subtitle: "Test export",
       recommendedChart: "map",
+      recommendedChartReason:
+        "A single-year state comparison is easiest to scan on a map.",
       supportedCharts: ["table", "map"],
       unitLabel: "Dollars",
       metricFamily: "pce-levels",
@@ -45,6 +47,7 @@ vi.mock("@/lib/services/query", () => ({
     },
     warnings: [],
     emptyStateReason: null,
+    emptyState: null,
   })),
 }));
 

@@ -15,6 +15,10 @@ export const chartRecommendationResponseSchema = z.object({
   recommendedView: chartTypeSchema,
   supportedViews: z.array(chartTypeSchema),
   reason: z.string(),
+  details: z.object({
+    selectedGeographyCount: z.number().int().nonnegative(),
+    yearCount: z.number().int().positive(),
+  }),
 });
 
 export type ChartRecommendationRequest = z.infer<

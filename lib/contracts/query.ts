@@ -39,6 +39,32 @@ export const queryRequestSchema = z.object({
     }),
 });
 
+export const queryRecoveryPatchSchema = z.object({
+  view: z.union([chartTypeSchema, z.literal("auto")]).optional(),
+  category: metricCategorySchema.optional(),
+  aggregation: metricAggregationSchema.optional(),
+  includeUsAggregate: z.boolean().optional(),
+  includeSelectedAggregate: z.boolean().optional(),
+  startYear: z.number().int().min(1900).max(2100).optional(),
+  endYear: z.number().int().min(1900).max(2100).optional(),
+  states: z.array(z.string().trim().min(1)).max(60).optional(),
+  excludedStates: z.array(z.string().trim().min(1)).max(60).optional(),
+});
+
+export const queryRecoveryActionSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  description: z.string().optional(),
+  patch: queryRecoveryPatchSchema,
+});
+
+export const queryEmptyStateSchema = z.object({
+  kind: z.enum(["no_results", "sparse", "unsupported"]),
+  title: z.string(),
+  description: z.string(),
+  suggestedActions: z.array(queryRecoveryActionSchema),
+});
+
 export const queryResponseSchema = z.object({
   requestEcho: queryRequestSchema,
   columns: z.array(queryColumnSchema),
@@ -49,6 +75,7 @@ export const queryResponseSchema = z.object({
     title: z.string(),
     subtitle: z.string(),
     recommendedChart: chartTypeSchema,
+    recommendedChartReason: z.string(),
     supportedCharts: z.array(chartTypeSchema),
     unitLabel: z.string(),
     metricFamily: z.string(),
@@ -56,7 +83,9 @@ export const queryResponseSchema = z.object({
   }),
   warnings: z.array(z.string()),
   emptyStateReason: z.string().nullable(),
+  emptyState: queryEmptyStateSchema.nullable(),
 });
 
 export type QueryRequest = z.infer<typeof queryRequestSchema>;
+export type QueryRecoveryPatch = z.infer<typeof queryRecoveryPatchSchema>;
 export type QueryResponse = z.infer<typeof queryResponseSchema>;

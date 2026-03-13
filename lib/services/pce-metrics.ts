@@ -1,5 +1,6 @@
 import { getMetricById } from "@/lib/catalog";
 import type { MetricCatalogEntry } from "@/lib/catalog/types";
+import { getChartSupport } from "@/lib/chart-support";
 import type { QueryRequest, QueryResponse } from "@/lib/contracts/query";
 import { queryReadOnly } from "@/lib/db/server";
 import {
@@ -130,6 +131,54 @@ function averageValues(values: Array<number | null>): number | null {
   }
 
   return present.reduce((total, value) => total + value, 0) / present.length;
+}
+
+function buildNoResultsEmptyState(
+  metric: MetricCatalogEntry,
+  _request: QueryRequest,
+  description: string,
+) {
+  const fallbackStartYear = Math.max(
+    metric.timeCoverage.startYear,
+    metric.timeCoverage.endYear - 3,
+  );
+
+  return {
+    kind: "no_results" as const,
+    title: "No rows matched these filters",
+    description,
+    suggestedActions: [
+      {
+        id: "latest-year",
+        label: "Jump to the latest year",
+        description: `Use ${metric.timeCoverage.endYear}, the latest covered year for this metric.`,
+        patch: {
+          startYear: metric.timeCoverage.endYear,
+          endYear: metric.timeCoverage.endYear,
+          view: "auto" as const,
+        },
+      },
+      {
+        id: "broaden-range",
+        label: "Broaden the time range",
+        description: "Expand to a short recent window to increase the chance of finding coverage.",
+        patch: {
+          startYear: fallbackStartYear,
+          endYear: metric.timeCoverage.endYear,
+          view: "auto" as const,
+        },
+      },
+      {
+        id: "all-category",
+        label: "Try all categories",
+        description: "Reset the category filter to the broadest option.",
+        patch: {
+          category: "all" as const,
+          view: "auto" as const,
+        },
+      },
+    ],
+  };
 }
 
 async function fetchPceLevels(lineCode: string, startYear: number, endYear: number) {
@@ -383,6 +432,25 @@ export async function buildPceLevelResponse(
     });
   }
 
+  const chartSupport = getChartSupport({
+    metricEntries: [metric],
+    selectedGeographyCount: hasMultipleYears
+      ? Math.max(selectedStates.size, 1)
+      : Math.max(outputRows.length, 1),
+    geographyLevel: "state",
+    startYear: request.timeRange.startYear,
+    endYear: request.timeRange.endYear,
+    requestedView: request.view,
+  });
+  const emptyState =
+    outputRows.length === 0
+      ? buildNoResultsEmptyState(
+          metric,
+          request,
+          "Try the latest year, broaden the time range, or reset back to all PCE.",
+        )
+      : null;
+
   return {
     requestEcho: request,
     columns: [
@@ -402,22 +470,18 @@ export async function buildPceLevelResponse(
       subtitle: hasMultipleYears
         ? `${categoryLabel} from ${request.timeRange.startYear} to ${request.timeRange.endYear}.`
         : `${categoryLabel} for ${request.timeRange.endYear}. Click states to update the selected aggregate.`,
-      recommendedChart:
-        request.view === "auto"
-          ? hasMultipleYears
-            ? selectedStates.size > 1
-              ? "multi_line"
-              : "line"
-            : "map"
-          : request.view,
-      supportedCharts: [...supportedCharts],
+      recommendedChart: chartSupport.recommendedView,
+      recommendedChartReason: chartSupport.reason,
+      supportedCharts: chartSupport.supportedViews.length > 0
+        ? chartSupport.supportedViews
+        : [...supportedCharts],
       unitLabel: metric.unit,
       metricFamily: metric.family,
       notes: metric.caveats,
     },
     warnings: [],
-    emptyStateReason:
-      outputRows.length === 0 ? "No state rows matched the requested filters." : null,
+    emptyStateReason: emptyState?.description ?? null,
+    emptyState,
   };
 }
 
@@ -532,12 +596,19 @@ export async function buildPceGrowthResponse(
         )
       : null;
   const categoryLabel = getCategoryLabel(metric, categoryId);
-
   const allOutputSeries = [usSeries, ...allSeries];
   if (excludedSeries) {
     allOutputSeries.push(excludedSeries);
   }
 
+  const chartSupport = getChartSupport({
+    metricEntries: [metric],
+    selectedGeographyCount: Math.max(allOutputSeries.length, 1),
+    geographyLevel: "state",
+    startYear: request.timeRange.startYear,
+    endYear: request.timeRange.endYear,
+    requestedView: request.view,
+  });
   const responseRows = allOutputSeries.flatMap((series) =>
     series.points.map((point) => ({
       geography: series.label,
@@ -545,6 +616,14 @@ export async function buildPceGrowthResponse(
       value: point.y,
     })),
   );
+  const emptyState =
+    responseRows.length === 0
+      ? buildNoResultsEmptyState(
+          metric,
+          request,
+          "Try a broader time window or reset to all categories to recover a trend series.",
+        )
+      : null;
 
   return {
     requestEcho: request,
@@ -592,8 +671,9 @@ export async function buildPceGrowthResponse(
       title: `${categoryLabel} PCE growth`,
       subtitle:
         "Year-over-year growth in nominal PCE. Use this for category storytelling when a true state-category price index is unavailable.",
-      recommendedChart: request.view === "auto" ? "multi_line" : request.view,
-      supportedCharts: metric.allowedChartTypes,
+      recommendedChart: chartSupport.recommendedView,
+      recommendedChartReason: chartSupport.reason,
+      supportedCharts: chartSupport.supportedViews,
       unitLabel: metric.unit,
       metricFamily: metric.family,
       notes: metric.caveats,
@@ -601,8 +681,8 @@ export async function buildPceGrowthResponse(
     warnings: [
       "This series reflects nominal spending growth rather than a pure price inflation index.",
     ],
-    emptyStateReason:
-      responseRows.length === 0 ? "No rows matched the requested growth query." : null,
+    emptyStateReason: emptyState?.description ?? null,
+    emptyState,
   };
 }
 
@@ -680,6 +760,22 @@ export async function buildPceInflationResponse(
       value: point.y,
     })),
   );
+  const chartSupport = getChartSupport({
+    metricEntries: [metric],
+    selectedGeographyCount: Math.max(stateSeries.length + 1, 1),
+    geographyLevel: "state",
+    startYear: request.timeRange.startYear,
+    endYear: request.timeRange.endYear,
+    requestedView: request.view,
+  });
+  const emptyState =
+    rows.length === 0
+      ? buildNoResultsEmptyState(
+          metric,
+          request,
+          "Try a broader year range or reset to the all-items series to restore coverage.",
+        )
+      : null;
 
   return {
     requestEcho: request,
@@ -714,14 +810,16 @@ export async function buildPceInflationResponse(
       title: "All-items PCE inflation",
       subtitle:
         "Year-over-year change in an implicit all-items PCE price index built from nominal and real state PCE.",
-      recommendedChart: request.view === "auto" ? "multi_line" : request.view,
-      supportedCharts: metric.allowedChartTypes,
+      recommendedChart: chartSupport.recommendedView,
+      recommendedChartReason: chartSupport.reason,
+      supportedCharts: chartSupport.supportedViews,
       unitLabel: metric.unit,
       metricFamily: metric.family,
       notes: metric.caveats,
     },
     warnings: [],
-    emptyStateReason: rows.length === 0 ? "No inflation rows matched the requested range." : null,
+    emptyStateReason: emptyState?.description ?? null,
+    emptyState,
   };
 }
 

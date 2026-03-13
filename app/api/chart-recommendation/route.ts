@@ -7,6 +7,7 @@ import {
   parseJsonRequest,
   validationErrorResponse,
 } from "@/lib/validation/request";
+import { buildRouteCacheHeaders, getCachedRouteValue } from "@/lib/route-cache";
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -14,9 +15,17 @@ export async function POST(request: Request): Promise<Response> {
       chartRecommendationRequestSchema,
       request,
     );
-    const response = getChartRecommendation(parsedRequest);
+    const ttlSeconds = 300;
+    const { value, cacheStatus } = await getCachedRouteValue({
+      scope: "chart-recommendation",
+      key: JSON.stringify(parsedRequest),
+      ttlSeconds,
+      loader: () => getChartRecommendation(parsedRequest),
+    });
 
-    return Response.json(chartRecommendationResponseSchema.parse(response));
+    return Response.json(chartRecommendationResponseSchema.parse(value), {
+      headers: buildRouteCacheHeaders({ ttlSeconds, cacheStatus }),
+    });
   } catch (error) {
     return validationErrorResponse(error);
   }

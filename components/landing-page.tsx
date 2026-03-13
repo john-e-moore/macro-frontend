@@ -84,6 +84,7 @@ export function LandingPage({
             <Link
               href={journey.href}
               className="mt-5 inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+              style={{ color: "#fff" }}
             >
               {journey.cta}
             </Link>

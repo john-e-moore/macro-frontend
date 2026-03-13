@@ -118,6 +118,7 @@ export function MetricCatalog({
                     <Link
                       href={`/explore?metric=${metric.id}`}
                       className="rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+                      style={{ color: "#fff" }}
                     >
                       Explore
                     </Link>

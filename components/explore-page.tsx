@@ -4,15 +4,25 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import type { MetricCatalogEntry, MetricCatalogSummary } from "@/lib/catalog/types";
-import type { QueryRequest, QueryResponse } from "@/lib/contracts/query";
+import type {
+  QueryRecoveryPatch,
+  QueryRequest,
+  QueryResponse,
+} from "@/lib/contracts/query";
 import {
-  buildQueryRequestFromState,
   defaultExplorerState,
+  type ExplorerState,
+} from "@/lib/explore-config";
+import {
+  applyExplorerRecoveryPatch,
+  buildQueryRequestFromState,
   getAvailableViews,
+  getExplorerChartSupport,
   getMetricCategoryOptions,
+  getMetricScopedDefaults,
+  listExplorerPresets,
   normalizeExplorerState,
   serializeExplorerState,
-  type ExplorerState,
 } from "@/lib/explore-state";
 
 import { MetadataPanel } from "@/components/metadata-panel";
@@ -115,48 +125,6 @@ function useQuery(request: QueryRequest) {
     : { data: state.data, loading: true, error: null };
 }
 
-const presets: Array<{ label: string; state: Partial<ExplorerState> }> = [
-  {
-    label: "PCE map",
-    state: {
-      metricId: "pce-total",
-      view: "map",
-      category: "all",
-      startYear: 2024,
-      endYear: 2024,
-      states: ["CA", "TX", "NY"],
-      excludedStates: [],
-    },
-  },
-  {
-    label: "PCE trend",
-    state: {
-      metricId: "pce-growth-yoy",
-      view: "multi_line",
-      category: "food",
-      startYear: 2021,
-      endYear: 2024,
-      states: ["CA", "TX", "NY"],
-      excludedStates: ["CA"],
-      includeSelectedAggregate: false,
-    },
-  },
-  {
-    label: "Federal comparison",
-    state: {
-      metricId: "federal-total-inflows",
-      view: "bar",
-      category: "all",
-      startYear: 2023,
-      endYear: 2023,
-      states: ["CA"],
-      excludedStates: [],
-      includeUsAggregate: false,
-      includeSelectedAggregate: false,
-    },
-  },
-];
-
 export function ExplorePage({
   initialState,
   metricOptions,
@@ -175,6 +143,7 @@ export function ExplorePage({
     null,
   );
   const [exportError, setExportError] = useState<string | null>(null);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
   const lastSerializedRef = useRef("");
 
   const metricById = useMemo(
@@ -184,39 +153,65 @@ export function ExplorePage({
   const selectedMetric =
     metricById.get(state.metricId) ?? metricEntries[0] ?? null;
   const categoryOptions = getMetricCategoryOptions(state.metricId);
+  const chartSupport = getExplorerChartSupport(state);
   const viewOptions = getAvailableViews(state);
   const request = useMemo(() => buildQueryRequestFromState(state), [state]);
   const queryState = useQuery(request);
+  const serializedState = useMemo(() => serializeExplorerState(state).toString(), [state]);
+  const shareUrl = useMemo(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+
+    return `${window.location.origin}${pathname}?${serializedState}`;
+  }, [pathname, serializedState]);
+  const presets = useMemo(() => listExplorerPresets(), []);
 
   useEffect(() => {
-    const serialized = serializeExplorerState(state).toString();
-
-    if (serialized === lastSerializedRef.current) {
+    if (serializedState === lastSerializedRef.current) {
       return;
     }
 
-    lastSerializedRef.current = serialized;
-    router.replace(`${pathname}?${serialized}`, { scroll: false });
-  }, [pathname, router, state]);
+    lastSerializedRef.current = serializedState;
+    router.replace(`${pathname}?${serializedState}`, { scroll: false });
+  }, [pathname, router, serializedState]);
 
   function updateState(patch: Partial<ExplorerState>) {
     setState((current) => {
       const nextMetricId = patch.metricId ?? current.metricId;
-      const nextMetric = metricById.get(nextMetricId);
-      const defaultCategory =
-        nextMetric?.dimensions?.find((dimension) => dimension.key === "category")
-          ?.defaultOptionId ?? "all";
+
+      if (patch.metricId && patch.metricId !== current.metricId) {
+        return normalizeExplorerState({
+          ...current,
+          ...getMetricScopedDefaults(nextMetricId),
+          ...patch,
+          metricId: nextMetricId,
+        });
+      }
 
       return normalizeExplorerState({
         ...current,
         ...patch,
-        metricId: nextMetricId,
-        category:
-          patch.metricId && patch.metricId !== current.metricId
-            ? (defaultCategory as ExplorerState["category"])
-            : (patch.category ?? current.category),
       });
     });
+  }
+
+  function applyRecoveryPatch(patch: QueryRecoveryPatch) {
+    setState((current) => applyExplorerRecoveryPatch(current, patch));
+  }
+
+  async function handleCopyShareLink() {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareStatus("Share link copied.");
+    } catch {
+      setShareStatus("Could not copy the link automatically.");
+    }
+  }
+
+  function handleReset() {
+    setState(normalizeExplorerState(defaultExplorerState));
+    setShareStatus("Explorer reset to defaults.");
   }
 
   async function handleExport(format: "csv" | "xlsx") {
@@ -252,26 +247,50 @@ export function ExplorePage({
             same metric definitions power filters, chart choices, metadata, and export
             files.
           </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              className="rounded-full bg-cyan-400 px-4 py-2 text-sm font-medium text-slate-950"
+              onClick={handleCopyShareLink}
+            >
+              Copy share link
+            </button>
+            <button
+              type="button"
+              className="rounded-full border border-white/15 px-4 py-2 text-sm font-medium text-slate-100"
+              onClick={handleReset}
+            >
+              Reset explorer
+            </button>
+          </div>
+          <p className="mt-3 max-w-2xl text-sm text-slate-300">
+            Shared links preserve the normalized metric, time, comparison, and view
+            state. Repeated identical reads may reuse a short-lived server cache, but
+            metric freshness still reflects the source cadence shown in metadata.
+          </p>
+          {shareStatus ? (
+            <p className="mt-2 text-sm text-cyan-200">{shareStatus}</p>
+          ) : null}
         </div>
         <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-5 text-sm leading-6 text-cyan-50">
           <p className="font-semibold">Starter presets</p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 grid gap-3">
             {presets.map((preset) => (
               <button
-                key={preset.label}
+                key={preset.id}
                 type="button"
-                className="rounded-full bg-slate-950/40 px-3 py-1.5 font-medium"
+                className="rounded-2xl border border-cyan-300/20 bg-slate-950/40 p-3 text-left"
                 onClick={() =>
-                  setState((current) =>
+                  setState(() =>
                     normalizeExplorerState({
-                      ...current,
                       ...defaultExplorerState,
                       ...preset.state,
                     }),
                   )
                 }
               >
-                {preset.label}
+                <p className="font-medium">{preset.label}</p>
+                <p className="mt-1 text-cyan-100/80">{preset.description}</p>
               </button>
             ))}
           </div>
@@ -286,6 +305,8 @@ export function ExplorePage({
             categoryOptions={categoryOptions}
             viewOptions={viewOptions}
             yearRange={selectedMetric.timeCoverage}
+            recommendedView={chartSupport.recommendedView}
+            recommendationReason={chartSupport.reason}
             onChange={updateState}
           />
           <ResultSurface
@@ -294,14 +315,19 @@ export function ExplorePage({
             loading={queryState.loading}
             error={queryState.error}
             selectedView={
-              state.view === "auto" ? viewOptions[0] ?? "table" : state.view
+              state.view === "auto"
+                ? (queryState.data?.display.recommendedChart ??
+                  chartSupport.recommendedView)
+                : state.view
             }
             viewOptions={viewOptions}
             selectedStates={state.states}
             exportingFormat={exportingFormat}
             exportError={exportError}
+            shareUrl={shareUrl}
             onViewChange={(view) => updateState({ view })}
             onExport={handleExport}
+            onApplyRecoveryPatch={applyRecoveryPatch}
             onToggleState={(stateAbbrev) =>
               updateState({
                 states: state.states.includes(stateAbbrev)

@@ -1,4 +1,5 @@
 import { getMetricsByIds } from "@/lib/catalog";
+import { getChartSupport } from "@/lib/chart-support";
 import type { QueryRequest, QueryResponse } from "@/lib/contracts/query";
 import { queryReadOnly } from "@/lib/db/server";
 import { formatCompactCurrency, formatPercent } from "@/lib/services/formatting";
@@ -106,6 +107,41 @@ export async function buildFederalComparisonResponse(
   });
 
   const selectedRow = dataRows.find((row) => row.stateAbbrev === selectedStateAbbrev) ?? null;
+  const chartSupport = getChartSupport({
+    metricEntries: getMetricsByIds(request.metricIds),
+    selectedGeographyCount: Math.max(dataRows.length, 1),
+    geographyLevel: "state",
+    startYear: year,
+    endYear: year,
+    requestedView: request.view,
+  });
+  const emptyState =
+    rows.length === 0
+      ? {
+          kind: "no_results" as const,
+          title: "No federal comparison rows matched",
+          description:
+            "Try the latest covered year or switch back to auto view to restore a supported comparison.",
+          suggestedActions: [
+            {
+              id: "latest-federal-year",
+              label: "Use 2023",
+              description: "Program-funding coverage currently ends in 2023.",
+              patch: {
+                startYear: 2023,
+                endYear: 2023,
+                view: "auto" as const,
+              },
+            },
+            {
+              id: "auto-view",
+              label: "Use auto view",
+              description: "Let the explorer pick a supported chart for this one-year comparison.",
+              patch: { view: "auto" as const },
+            },
+          ],
+        }
+      : null;
 
   return {
     requestEcho: request,
@@ -195,8 +231,9 @@ export async function buildFederalComparisonResponse(
       title: "Federal money versus GDP",
       subtitle:
         "Compare direct transfers to people, program funding to state governments, combined inflows, and GDP for the selected year.",
-      recommendedChart: request.view === "auto" ? "bar" : request.view,
-      supportedCharts: ["table", "bar", "map"],
+      recommendedChart: chartSupport.recommendedView,
+      recommendedChartReason: chartSupport.reason,
+      supportedCharts: chartSupport.supportedViews,
       unitLabel: "Dollars",
       metricFamily: "federal-inflows",
       notes: [
@@ -207,6 +244,7 @@ export async function buildFederalComparisonResponse(
       selectedStateRow && selectedStateRow.federal_stategov_receipts_dollars === null
         ? ["Program-funding data is unavailable for the selected geography and year."]
         : [],
-    emptyStateReason: rows.length === 0 ? "No federal comparison rows matched the requested year." : null,
+    emptyStateReason: emptyState?.description ?? null,
+    emptyState,
   };
 }

@@ -1,22 +1,18 @@
 import { getMetricById } from "@/lib/catalog";
-import type { ChartType } from "@/lib/catalog/types";
-import type { QueryRequest } from "@/lib/contracts/query";
+import type { ChartType, MetricCatalogEntry } from "@/lib/catalog/types";
+import { getChartSupport } from "@/lib/chart-support";
+import {
+  defaultExplorerState,
+  explorerPresets,
+  type ExplorerPreset,
+  type ExplorerState,
+  type ExplorerView,
+} from "@/lib/explore-config";
+import type {
+  QueryRecoveryPatch,
+  QueryRequest,
+} from "@/lib/contracts/query";
 import { isStateCode } from "@/lib/geography";
-
-export type ExplorerView = ChartType | "auto";
-
-export type ExplorerState = {
-  metricId: string;
-  view: ExplorerView;
-  category: QueryRequest["options"]["category"];
-  aggregation: QueryRequest["options"]["aggregation"];
-  includeUsAggregate: boolean;
-  includeSelectedAggregate: boolean;
-  startYear: number;
-  endYear: number;
-  states: string[];
-  excludedStates: string[];
-};
 
 export const federalComparisonMetricIds = [
   "federal-direct-transfers",
@@ -48,19 +44,6 @@ const validViews: ExplorerView[] = [
   "multi_line",
   "map",
 ] as const;
-
-export const defaultExplorerState: ExplorerState = {
-  metricId: "pce-total",
-  view: "auto",
-  category: "all",
-  aggregation: "selected_plus_us",
-  includeUsAggregate: true,
-  includeSelectedAggregate: true,
-  startYear: 2024,
-  endYear: 2024,
-  states: ["CA", "TX", "NY"],
-  excludedStates: [],
-};
 
 function getSingleValue(
   value: string | string[] | undefined,
@@ -100,6 +83,64 @@ function isFederalMetric(metricId: string): boolean {
   return metric?.family === "federal-inflows" || metric?.family === "gdp";
 }
 
+function isTrendMetric(metricId: string): boolean {
+  return metricId === "pce-growth-yoy" || metricId === "pce-inflation-yoy";
+}
+
+function getMetricDefaultCategory(metric: MetricCatalogEntry | null): ExplorerState["category"] {
+  return (
+    (metric?.dimensions?.find((dimension) => dimension.key === "category")
+      ?.defaultOptionId as ExplorerState["category"] | undefined) ?? "all"
+  );
+}
+
+function getMetricDefaultStates(metricId: string): string[] {
+  return isFederalMetric(metricId) ? ["CA"] : defaultExplorerState.states;
+}
+
+export function getMetricScopedDefaults(metricId: string): Partial<ExplorerState> {
+  const metric = getMetricById(metricId);
+  const endYear = metric?.timeCoverage.endYear ?? defaultExplorerState.endYear;
+  const startYear = isTrendMetric(metricId)
+    ? Math.max((metric?.timeCoverage.startYear ?? endYear) as number, endYear - 3)
+    : endYear;
+
+  return {
+    metricId,
+    category: getMetricDefaultCategory(metric),
+    aggregation: isFederalMetric(metricId) ? "selected_only" : "selected_plus_us",
+    includeUsAggregate: !isFederalMetric(metricId),
+    includeSelectedAggregate: !isFederalMetric(metricId) && !isTrendMetric(metricId),
+    startYear,
+    endYear,
+    states: getMetricDefaultStates(metricId),
+    excludedStates: [],
+    view: "auto",
+  };
+}
+
+export function listExplorerPresets(): ExplorerPreset[] {
+  return explorerPresets;
+}
+
+export function getExplorerChartSupport(state: ExplorerState) {
+  const metric = getMetricById(state.metricId);
+  const hasMultipleYears = state.startYear !== state.endYear;
+  const selectedGeographyCount =
+    !hasMultipleYears && metric?.family === "pce-levels"
+      ? Math.max(state.states.length, 2)
+      : Math.max(state.states.length, 1);
+
+  return getChartSupport({
+    metricEntries: metric ? [metric] : [],
+    selectedGeographyCount,
+    geographyLevel: "state",
+    startYear: state.startYear,
+    endYear: state.endYear,
+    requestedView: state.view,
+  });
+}
+
 export function getMetricCategoryOptions(metricId: string) {
   const metric = getMetricById(metricId);
 
@@ -110,22 +151,11 @@ export function getMetricCategoryOptions(metricId: string) {
 }
 
 export function getAvailableViews(state: ExplorerState): ChartType[] {
-  if (isFederalMetric(state.metricId)) {
-    return ["table", "bar", "map"];
-  }
+  return getExplorerChartSupport(state).supportedViews;
+}
 
-  if (
-    state.metricId === "pce-growth-yoy" ||
-    state.metricId === "pce-inflation-yoy"
-  ) {
-    return ["table", "line", "multi_line"];
-  }
-
-  if (state.startYear === state.endYear) {
-    return ["table", "bar", "map"];
-  }
-
-  return ["table", "line", "multi_line"];
+export function getRecommendedExplorerView(state: ExplorerState) {
+  return getExplorerChartSupport(state);
 }
 
 export function normalizeExplorerState(
@@ -133,14 +163,23 @@ export function normalizeExplorerState(
 ): ExplorerState {
   const metric = getMetricById(state.metricId) ?? getMetricById(defaultExplorerState.metricId);
   const metricId = metric?.id ?? defaultExplorerState.metricId;
+  const metricDefaults = getMetricScopedDefaults(metricId);
   const categoryOptions = getMetricCategoryOptions(metricId).map((option) => option.id);
-  const category = categoryOptions.includes(state.category) ? state.category : "all";
-  const startYear = Math.max(metric?.timeCoverage.startYear ?? 2000, state.startYear);
-  const endYear = Math.min(metric?.timeCoverage.endYear ?? 2024, state.endYear);
+  const category = categoryOptions.includes(state.category)
+    ? state.category
+    : (metricDefaults.category ?? "all");
+  const normalizedEndYear = Math.min(
+    metric?.timeCoverage.endYear ?? defaultExplorerState.endYear,
+    state.endYear,
+  );
+  const normalizedStartYear = Math.max(
+    metric?.timeCoverage.startYear ?? defaultExplorerState.startYear,
+    isFederalMetric(metricId) ? normalizedEndYear : state.startYear,
+  );
   const normalizedRange =
-    startYear <= endYear
-      ? { startYear, endYear }
-      : { startYear: endYear, endYear };
+    normalizedStartYear <= normalizedEndYear
+      ? { startYear: normalizedStartYear, endYear: normalizedEndYear }
+      : { startYear: normalizedEndYear, endYear: normalizedEndYear };
   const availableViews = getAvailableViews({
     ...state,
     metricId,
@@ -156,10 +195,20 @@ export function normalizeExplorerState(
     ...state,
     metricId,
     category,
+    aggregation:
+      validAggregations.includes(state.aggregation)
+        ? state.aggregation
+        : (metricDefaults.aggregation ?? defaultExplorerState.aggregation),
     view,
     ...normalizedRange,
-    states: state.states.length > 0 ? state.states : defaultExplorerState.states,
-    excludedStates: state.excludedStates,
+    includeUsAggregate: isFederalMetric(metricId)
+      ? false
+      : state.includeUsAggregate,
+    includeSelectedAggregate: isFederalMetric(metricId) || isTrendMetric(metricId)
+      ? false
+      : state.includeSelectedAggregate,
+    states: state.states.length > 0 ? state.states : getMetricDefaultStates(metricId),
+    excludedStates: isTrendMetric(metricId) ? state.excludedStates : [],
   };
 }
 
@@ -215,6 +264,16 @@ export function serializeExplorerState(state: ExplorerState): URLSearchParams {
   }
 
   return params;
+}
+
+export function applyExplorerRecoveryPatch(
+  state: ExplorerState,
+  patch: QueryRecoveryPatch,
+): ExplorerState {
+  return normalizeExplorerState({
+    ...state,
+    ...patch,
+  });
 }
 
 export function buildQueryRequestFromState(

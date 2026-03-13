@@ -10,6 +10,46 @@ import {
 } from "@/lib/services/pce-metrics";
 import { RequestValidationError } from "@/lib/validation/request";
 
+function buildUnsupportedQueryResponse(request: QueryRequest): QueryResponse {
+  const recommendation = getChartRecommendation(request);
+
+  return {
+    requestEcho: request,
+    columns: [],
+    rows: [],
+    series: [],
+    aggregates: [],
+    display: {
+      title: "Unsupported query",
+      subtitle:
+        "This metric combination is not yet wired to a live explorer query in the current product scope.",
+      recommendedChart: recommendation.recommendedView,
+      recommendedChartReason: recommendation.reason,
+      supportedCharts: recommendation.supportedViews,
+      unitLabel: "N/A",
+      metricFamily: "unsupported",
+      notes: [],
+    },
+    warnings: [],
+    emptyStateReason:
+      "The selected metric combination does not have a live query implementation yet.",
+    emptyState: {
+      kind: "unsupported",
+      title: "This combination is not available yet",
+      description:
+        "Try one metric at a time in the explorer or switch back to a supported preset to keep moving.",
+      suggestedActions: [
+        {
+          id: "reset-view",
+          label: "Use auto view",
+          description: "Let the explorer pick a supported chart for the current state.",
+          patch: { view: "auto" },
+        },
+      ],
+    },
+  };
+}
+
 export async function runQuery(request: QueryRequest): Promise<QueryResponse> {
   const metrics = getMetricsByIds(request.metricIds);
 
@@ -45,12 +85,5 @@ export async function runQuery(request: QueryRequest): Promise<QueryResponse> {
     return buildFederalComparisonResponse(request);
   }
 
-  const recommendation = getChartRecommendation(request);
-  throw new RequestValidationError(
-    "The selected metric combination does not have a live Phase 1 query implementation yet.",
-    {
-      metricIds: request.metricIds,
-      recommendedView: recommendation.recommendedView,
-    },
-  );
+  return buildUnsupportedQueryResponse(request);
 }

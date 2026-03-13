@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChartType, MetricCatalogEntry } from "@/lib/catalog/types";
-import type { QueryResponse } from "@/lib/contracts/query";
+import type { QueryRecoveryPatch, QueryResponse } from "@/lib/contracts/query";
 import { getStateName } from "@/lib/geography";
 
 import { SimpleBarChart } from "@/components/simple-bar-chart";
@@ -192,6 +192,39 @@ function ErrorCard({ message }: { message: string }) {
   );
 }
 
+function EmptyStateCard({
+  emptyState,
+  onApplyRecoveryPatch,
+}: {
+  emptyState: NonNullable<QueryResponse["emptyState"]>;
+  onApplyRecoveryPatch: (patch: QueryRecoveryPatch) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6">
+      <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
+        {emptyState.kind}
+      </p>
+      <h3 className="mt-2 text-lg font-semibold text-slate-950">{emptyState.title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{emptyState.description}</p>
+      {emptyState.suggestedActions.length > 0 ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {emptyState.suggestedActions.map((action) => (
+            <button
+              key={action.id}
+              type="button"
+              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700"
+              onClick={() => onApplyRecoveryPatch(action.patch)}
+              title={action.description}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function ResultSurface({
   metric,
   data,
@@ -202,8 +235,10 @@ export function ResultSurface({
   selectedStates,
   exportingFormat,
   exportError,
+  shareUrl,
   onViewChange,
   onExport,
+  onApplyRecoveryPatch,
   onToggleState,
 }: {
   metric: MetricCatalogEntry;
@@ -215,8 +250,10 @@ export function ResultSurface({
   selectedStates: string[];
   exportingFormat: "csv" | "xlsx" | null;
   exportError: string | null;
+  shareUrl: string;
   onViewChange: (view: ChartType) => void;
   onExport: (format: "csv" | "xlsx") => void;
+  onApplyRecoveryPatch: (patch: QueryRecoveryPatch) => void;
   onToggleState: (stateAbbrev: string) => void;
 }) {
   const activeView = data?.display.supportedCharts.includes(selectedView)
@@ -235,6 +272,13 @@ export function ResultSurface({
               {data?.display.subtitle ??
                 "Run a query to see chart-ready rows, notes, and export options."}
             </p>
+            {data?.display.recommendedChartReason ? (
+              <p className="mt-2 text-sm text-cyan-700">
+                Recommended view:{" "}
+                <span className="font-medium">{data.display.recommendedChart}</span>.{" "}
+                {data.display.recommendedChartReason}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             {viewOptions.map((view) => (
@@ -274,18 +318,22 @@ export function ResultSurface({
         {exportError ? (
           <p className="mt-3 text-sm text-rose-700">{exportError}</p>
         ) : null}
+        <p className="mt-3 truncate text-xs text-slate-500">
+          Shareable URL: {shareUrl}
+        </p>
       </div>
 
       {loading ? <LoadingCard message="Loading results..." /> : null}
       {error ? <ErrorCard message={error} /> : null}
 
-      {data?.emptyStateReason ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
-          {data.emptyStateReason}
-        </div>
+      {data?.emptyState ? (
+        <EmptyStateCard
+          emptyState={data.emptyState}
+          onApplyRecoveryPatch={onApplyRecoveryPatch}
+        />
       ) : null}
 
-      {data && !data.emptyStateReason ? (
+      {data && !data.emptyState ? (
         <>
           <AggregateCards aggregates={data.aggregates} />
 

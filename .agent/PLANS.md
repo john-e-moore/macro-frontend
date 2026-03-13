@@ -179,6 +179,7 @@ Use this section to track in-flight plans:
 
 - `2026-03-12 - Phase 0 Foundations - status: in_progress - owner: Cursor agent`
 - `2026-03-12 - Phase 1 MVP - status: completed - owner: Cursor agent`
+- `2026-03-13 - Phase 2 V1 Improvements - status: completed - owner: Cursor agent`
 
 ---
 
@@ -421,3 +422,124 @@ Expected outcomes:
   - `POST /api/chart-recommendation`
   - `POST /api/export`
 - Shared UI-to-data interface: `lib/contracts/query.ts`
+
+---
+
+# Phase 2 V1 Improvements
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+## Purpose / Big Picture
+
+Improve the `/explore` workflow so users reach a successful chart faster, recover from empty or unsupported states more easily, and share the exact explorer state with clearer freshness expectations.
+
+## Links
+
+- Branch: `feature/phase-2-v1-improvements`
+- Feature brief: `N/A`
+- PR: `pending`
+- `.cursor` plan: `.cursor/plans/phase-2-v1-plan_89590e4c.plan.md`
+
+## Progress
+
+- [x] (2026-03-13 00:00Z) Initial planning completed in `.cursor/plans/phase-2-v1-plan_89590e4c.plan.md`.
+- [x] Shared explorer defaults, presets, recommendation logic, and recovery actions implemented.
+- [x] Validation and documentation updates completed.
+
+## Surprises & Discoveries
+
+- Observation: The MVP already preserved explorer state in the URL, so the real Phase 2 gap was clearer affordances and normalization rather than inventing a new persistence mechanism.
+  Evidence: `lib/explore-state.ts` already parsed and serialized the full `/explore` query state before Phase 2 edits began.
+- Observation: The existing query services already generated enough shape metadata to support smarter chart recommendations without redesigning the API surface from scratch.
+  Evidence: `lib/services/pce-metrics.ts` and `lib/services/federal-metrics.ts` already emitted `supportedCharts`, `series`, and display metadata.
+
+## Decision Log
+
+- Decision: Keep Phase 2 shareability URL-first and leave persisted saved views as a follow-on.
+  Rationale: The user chose to sequence stronger share links ahead of storage/auth design, and the roadmap allows either saved or shareable views.
+  Date/Author: 2026-03-13, Cursor agent
+- Decision: Use a small in-process route cache with explicit short TTLs instead of introducing a dedicated cache service.
+  Rationale: This keeps caching behavior simple, reviewable, and aligned with the project guidance to prefer predictable freshness over opaque magic.
+  Date/Author: 2026-03-13, Cursor agent
+
+## Outcomes & Retrospective
+
+Phase 2 now upgrades the explorer experience without widening product scope:
+
+- shared preset definitions and metric-scoped defaults improve the first successful chart,
+- `/explore` exposes share/reset controls and clearer recommendation messaging,
+- query responses can return structured empty-state recovery actions instead of a plain string,
+- repeated identical read-path requests reuse explicit short-lived route caching,
+- test coverage and README documentation now reflect the richer explorer workflow.
+
+Persisted named saved views are still intentionally out of scope until storage and ownership requirements are defined.
+
+## Context and Orientation
+
+- `lib/explore-config.ts` now holds the reusable explorer state shape and preset definitions.
+- `lib/explore-state.ts` normalizes URL state, metric-scoped defaults, and recovery patches.
+- `lib/chart-support.ts` centralizes supported-view and recommended-view reasoning for both UI and API layers.
+- `components/explore-page.tsx`, `components/query-builder.tsx`, and `components/result-surface.tsx` implement the visible Phase 2 UX.
+- `app/api/metrics/search/route.ts`, `app/api/metrics/[metricId]/route.ts`, `app/api/chart-recommendation/route.ts`, and `app/api/query/route.ts` now apply explicit route-cache behavior.
+- `tests/*` includes new coverage for chart recommendation logic and route-cache behavior.
+
+## Plan of Work
+
+1. Move explorer defaults and preset definitions into a reusable module.
+2. Centralize chart recommendation rules so the explorer UI and API agree on supported and suggested views.
+3. Extend the query response contract with recommendation reasons and structured empty-state recovery actions.
+4. Add share/reset affordances and guided copy to the `/explore` UI.
+5. Add explicit short-lived caching for repeated read-path requests and document the freshness trade-offs.
+6. Update tests and README to match the new explorer behavior.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-frontend
+    npm run lint
+    npm run typecheck
+    npm run test
+
+Expected outcomes:
+
+- lint passes for the shared state, route-cache, and UI changes,
+- typecheck passes across the richer query contract and response handling,
+- tests cover the new chart-support rules, route-cache behavior, and updated contracts.
+
+## Validation and Acceptance
+
+- A user can copy a share link from `/explore` and keep the normalized explorer state in the URL.
+- Starter presets and metric-scoped defaults lead users toward a valid chart without manual correction.
+- Empty or unsupported states present actionable recovery buttons rather than a dead-end message.
+- The recommended chart and supported chart options stay aligned between UI state and API responses.
+- Repeated identical read requests are explicitly cacheable for short windows without hiding source freshness messaging.
+
+## Risks and Recovery
+
+- Risk: In-memory route caching may not survive process restarts or multi-instance deployments consistently.
+  Recovery: TTLs are short, the cache is advisory only, and behavior still works correctly on a cache miss.
+- Risk: Explorer recovery actions could drift from the normalized URL-state model.
+  Recovery: Keep recovery patches funneled through `normalizeExplorerState()` and cover them with unit tests.
+- Risk: Single-year map/bar recommendations can drift if backend result shapes change.
+  Recovery: Keep `lib/chart-support.ts` as the shared decision point and update service tests when result semantics change.
+
+## Artifacts and Notes
+
+- Plan file: `.cursor/plans/phase-2-v1-plan_89590e4c.plan.md`
+- Shared helpers: `lib/explore-config.ts`, `lib/explore-state.ts`, `lib/chart-support.ts`, `lib/route-cache.ts`
+- Validation:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test`
+  - manual browser verification of `/explore` share/reset controls, presets, and recommendation copy
+
+## Interfaces and Dependencies
+
+- Dependencies: `next`, `react`, `zod`, `pg`, `server-only`, `xlsx`, `vitest`
+- Updated endpoints:
+  - `GET /api/metrics/search`
+  - `GET /api/metrics/[metricId]`
+  - `POST /api/query`
+  - `POST /api/chart-recommendation`
+- Updated shared contracts:
+  - `lib/contracts/query.ts`
+  - `lib/contracts/chart-recommendation.ts`

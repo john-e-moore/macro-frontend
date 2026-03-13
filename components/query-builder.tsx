@@ -2,9 +2,8 @@
 
 import type { MetricCatalogSummary } from "@/lib/catalog/types";
 import type { QueryRequest } from "@/lib/contracts/query";
+import type { ExplorerState, ExplorerView } from "@/lib/explore-config";
 import { stateOptions } from "@/lib/geography";
-
-import type { ExplorerState, ExplorerView } from "@/lib/explore-state";
 
 function MultiSelect({
   label,
@@ -49,6 +48,8 @@ export function QueryBuilder({
   categoryOptions,
   viewOptions,
   yearRange,
+  recommendedView,
+  recommendationReason,
   onChange,
 }: {
   state: ExplorerState;
@@ -56,6 +57,8 @@ export function QueryBuilder({
   categoryOptions: Array<{ id: string; label: string }>;
   viewOptions: ExplorerView[];
   yearRange: { startYear: number; endYear: number };
+  recommendedView: ExplorerView;
+  recommendationReason: string;
   onChange: (patch: Partial<ExplorerState>) => void;
 }) {
   const selectedMetric = metricOptions.find((metric) => metric.id === state.metricId);
@@ -72,6 +75,10 @@ export function QueryBuilder({
           <p className="mt-1 text-sm leading-6 text-slate-600">
             Choose a metric, tune the geography and time range, then switch between
             the supported result views.
+          </p>
+          <p className="mt-2 text-sm leading-6 text-cyan-700">
+            Suggested starting view: <span className="font-medium">{recommendedView}</span>.{" "}
+            {recommendationReason}
           </p>
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">

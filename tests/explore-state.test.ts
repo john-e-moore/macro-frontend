@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildQueryRequestFromState,
+  getMetricScopedDefaults,
   parseExplorerState,
   serializeExplorerState,
 } from "@/lib/explore-state";
@@ -54,5 +55,25 @@ describe("explore state", () => {
       "state-gdp",
     ]);
     expect(request.options.includeUsAggregate).toBe(false);
+  });
+
+  it("uses metric-scoped defaults for trend metrics", () => {
+    const defaults = getMetricScopedDefaults("pce-growth-yoy");
+
+    expect(defaults.startYear).toBe(2021);
+    expect(defaults.endYear).toBe(2024);
+    expect(defaults.includeSelectedAggregate).toBe(false);
+  });
+
+  it("normalizes federal metrics to a single-year query", () => {
+    const state = parseExplorerState({
+      metric: "federal-total-inflows",
+      startYear: "2021",
+      endYear: "2023",
+      states: "CA",
+    });
+
+    expect(state.startYear).toBe(2023);
+    expect(state.endYear).toBe(2023);
   });
 });

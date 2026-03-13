@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { chartRecommendationRequestSchema } from "@/lib/contracts/chart-recommendation";
 import { exportRequestSchema } from "@/lib/contracts/export";
 import { metricSearchRequestSchema } from "@/lib/contracts/metric-search";
-import { queryRequestSchema } from "@/lib/contracts/query";
+import { queryRequestSchema, queryResponseSchema } from "@/lib/contracts/query";
 
 describe("contracts", () => {
   it("coerces search request values", () => {
@@ -72,5 +72,54 @@ describe("contracts", () => {
         format: "xlsx",
       }).format,
     ).toBe("xlsx");
+  });
+
+  it("accepts structured query empty states", () => {
+    expect(
+      queryResponseSchema.parse({
+        requestEcho: queryRequestSchema.parse({
+          metricIds: ["pce-total"],
+          geography: {
+            level: "state",
+            values: ["CA"],
+          },
+          timeRange: {
+            startYear: 2024,
+            endYear: 2024,
+          },
+          view: "auto",
+        }),
+        columns: [],
+        rows: [],
+        series: [],
+        aggregates: [],
+        display: {
+          title: "Unsupported query",
+          subtitle: "No live query exists.",
+          recommendedChart: "table",
+          recommendedChartReason: "A table is the safest fallback.",
+          supportedCharts: ["table"],
+          unitLabel: "N/A",
+          metricFamily: "unsupported",
+          notes: [],
+        },
+        warnings: [],
+        emptyStateReason: "No rows matched.",
+        emptyState: {
+          kind: "unsupported",
+          title: "This combination is not available yet",
+          description: "Try a supported view instead.",
+          suggestedActions: [
+            {
+              id: "auto-view",
+              label: "Use auto view",
+              patch: {
+                view: "auto",
+              },
+            },
+          ],
+        },
+      }).emptyState?.kind,
+    ).toBe("unsupported");
   });
 });

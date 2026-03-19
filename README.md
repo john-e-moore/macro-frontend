@@ -82,6 +82,7 @@ The live metric workflows currently cover:
 - state PCE maps and multi-year PCE level comparisons,
 - selected-state aggregate recomputation alongside derived US overall values,
 - PCE trend storytelling with all-items implicit inflation and category-level nominal growth,
+- annual RPP-weighted national price-level comparisons with state exclusion scenarios,
 - federal direct-transfer and program-funding comparisons against state GDP.
 
 The Phase 2 explorer improvements specifically add:
@@ -97,6 +98,7 @@ The Phase 2 explorer improvements specifically add:
 - State PCE levels currently use annual BEA SAPCE1 state data.
 - Per-capita PCE is derived in the app from raw PCE plus resident population because the current serving convenience view duplicates Census rows.
 - True state-category PCE price indexes are not available in the current serving layer, so category trend stories use nominal PCE growth. All-items implicit PCE inflation is still available via nominal versus real PCE.
+- National price-level exclusion comparisons use `v_state_rpp_pce_weighted_annual` and recompute the national index from state `weighted_rpp` and `pce_share` rows when states are excluded.
 
 ## Explorer Workflow
 

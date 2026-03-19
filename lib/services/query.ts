@@ -8,6 +8,7 @@ import {
   buildPceLevelResponse,
   isPceMetric,
 } from "@/lib/services/pce-metrics";
+import { buildRppPriceLevelResponse } from "@/lib/services/rpp-metrics";
 import { RequestValidationError } from "@/lib/validation/request";
 
 function buildUnsupportedQueryResponse(request: QueryRequest): QueryResponse {
@@ -59,7 +60,7 @@ export async function runQuery(request: QueryRequest): Promise<QueryResponse> {
     });
   }
 
-  if (request.metricIds.length === 1 && isPceMetric(request.metricIds[0])) {
+  if (request.metricIds.length === 1) {
     const metric = getMetricById(request.metricIds[0]);
 
     if (!metric) {
@@ -68,16 +69,22 @@ export async function runQuery(request: QueryRequest): Promise<QueryResponse> {
       });
     }
 
-    if (metric.id === "pce-total" || metric.id === "pce-per-capita") {
-      return buildPceLevelResponse(metric, request);
+    if (isPceMetric(metric.id)) {
+      if (metric.id === "pce-total" || metric.id === "pce-per-capita") {
+        return buildPceLevelResponse(metric, request);
+      }
+
+      if (metric.id === "pce-growth-yoy") {
+        return buildPceGrowthResponse(metric, request);
+      }
+
+      if (metric.id === "pce-inflation-yoy") {
+        return buildPceInflationResponse(metric, request);
+      }
     }
 
-    if (metric.id === "pce-growth-yoy") {
-      return buildPceGrowthResponse(metric, request);
-    }
-
-    if (metric.id === "pce-inflation-yoy") {
-      return buildPceInflationResponse(metric, request);
+    if (metric.family === "rpp-price-levels") {
+      return buildRppPriceLevelResponse(metric, request);
     }
   }
 

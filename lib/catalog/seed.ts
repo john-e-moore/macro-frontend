@@ -22,6 +22,19 @@ const pceCategoryDimension = {
   ],
 };
 
+const rppCategoryDimension = {
+  key: "category" as const,
+  label: "RPP category",
+  defaultOptionId: "all_items",
+  options: [
+    { id: "all_items", label: "All items" },
+    { id: "goods", label: "Goods" },
+    { id: "housing_rents", label: "Housing rents" },
+    { id: "other_services", label: "Other services" },
+    { id: "utilities", label: "Utilities" },
+  ],
+};
+
 export const metricCatalogSeed: MetricCatalogEntry[] = [
   {
     id: "pce-total",
@@ -215,6 +228,53 @@ export const metricCatalogSeed: MetricCatalogEntry[] = [
         health: "16",
         food_services: "19",
       },
+    },
+  },
+  {
+    id: "rpp-national-price-level",
+    family: "rpp-price-levels",
+    displayName: "National Price Level",
+    shortDescription:
+      "Annual RPP-based national price level with optional state exclusions and state comparisons.",
+    definition:
+      "Uses state regional price parities weighted by category PCE shares to recompute a national annual price level. Excluding states recomputes the weighted national average from the remaining state rows.",
+    unit: "Index (US=100)",
+    source: {
+      id: "bea",
+      name: "Bureau of Economic Analysis",
+      url: "https://www.bea.gov/data/prices-inflation/regional-price-parities-state-and-metro-area",
+    },
+    caveats: [
+      "This is an annual weighted price-level index, not nominal spending growth.",
+      "The serving view exposes category mappings such as housing-rent and utilities proxies; interpretation should follow the mapped RPP/PCE functions shown in metadata.",
+    ],
+    aliases: [
+      "rpp",
+      "regional price parity",
+      "national price level",
+      "rent prices",
+      "utilities prices",
+    ],
+    allowedGeographies: ["state"],
+    timeCoverage: {
+      startYear: 2008,
+      endYear: 2024,
+    },
+    allowedChartTypes: ["table", "bar", "line", "multi_line"],
+    category: "Prices",
+    freshness: "Annual BEA refresh",
+    status: "live",
+    dimensions: [rppCategoryDimension],
+    derivation: {
+      kind: "ratio",
+      description: "Weighted average of state RPP values using category-level PCE shares.",
+    },
+    backing: {
+      viewName: "v_state_rpp_pce_weighted_annual",
+      notes: [
+        "US overall is derived by summing weighted_rpp across all states for the selected year and category.",
+        "US excluding selected states is derived by dividing included weighted_rpp by the included pce_share total.",
+      ],
     },
   },
   {

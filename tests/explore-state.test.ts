@@ -76,4 +76,22 @@ describe("explore state", () => {
     expect(state.startYear).toBe(2023);
     expect(state.endYear).toBe(2023);
   });
+
+  it("preserves excluded states for the RPP price-level metric", () => {
+    const state = parseExplorerState({
+      metric: "rpp-national-price-level",
+      category: "housing_rents",
+      startYear: "2021",
+      endYear: "2024",
+      states: "ca,ny,tx",
+      excludedStates: "ca,ny",
+    });
+
+    const request = buildQueryRequestFromState(state);
+
+    expect(state.category).toBe("housing_rents");
+    expect(state.excludedStates).toEqual(["CA", "NY"]);
+    expect(request.options.category).toBe("housing_rents");
+    expect(request.options.excludedGeographies).toEqual(["CA", "NY"]);
+  });
 });

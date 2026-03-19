@@ -16,6 +16,10 @@ describe("metric catalog", () => {
     expect(getMetricById("pce-per-capita")?.displayName).toBe("PCE Per Capita");
   });
 
+  it("exposes the RPP national price-level metric", () => {
+    expect(getMetricById("rpp-national-price-level")?.family).toBe("rpp-price-levels");
+  });
+
   it("searches aliases and descriptions", () => {
     const results = searchMetrics("inflation");
 

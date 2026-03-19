@@ -13,6 +13,12 @@ import type {
   QueryRequest,
 } from "@/lib/contracts/query";
 import { isStateCode } from "@/lib/geography";
+import {
+  isFederalMetric,
+  isTrendMetric,
+  supportsExcludedStates,
+  supportsSelectedAggregate,
+} from "@/lib/metric-capabilities";
 
 export const federalComparisonMetricIds = [
   "federal-direct-transfers",
@@ -20,15 +26,6 @@ export const federalComparisonMetricIds = [
   "federal-total-inflows",
   "state-gdp",
 ] as const;
-
-const validCategories: QueryRequest["options"]["category"][] = [
-  "all",
-  "food",
-  "gas",
-  "housing",
-  "health",
-  "food_services",
-];
 
 const validAggregations: QueryRequest["options"]["aggregation"][] = [
   "selected_only",
@@ -77,16 +74,6 @@ function parseNumber(
   return Number.isInteger(parsed) ? parsed : fallback;
 }
 
-function isFederalMetric(metricId: string): boolean {
-  const metric = getMetricById(metricId);
-
-  return metric?.family === "federal-inflows" || metric?.family === "gdp";
-}
-
-function isTrendMetric(metricId: string): boolean {
-  return metricId === "pce-growth-yoy" || metricId === "pce-inflation-yoy";
-}
-
 function getMetricDefaultCategory(metric: MetricCatalogEntry | null): ExplorerState["category"] {
   return (
     (metric?.dimensions?.find((dimension) => dimension.key === "category")
@@ -110,7 +97,7 @@ export function getMetricScopedDefaults(metricId: string): Partial<ExplorerState
     category: getMetricDefaultCategory(metric),
     aggregation: isFederalMetric(metricId) ? "selected_only" : "selected_plus_us",
     includeUsAggregate: !isFederalMetric(metricId),
-    includeSelectedAggregate: !isFederalMetric(metricId) && !isTrendMetric(metricId),
+    includeSelectedAggregate: supportsSelectedAggregate(metricId),
     startYear,
     endYear,
     states: getMetricDefaultStates(metricId),
@@ -204,11 +191,11 @@ export function normalizeExplorerState(
     includeUsAggregate: isFederalMetric(metricId)
       ? false
       : state.includeUsAggregate,
-    includeSelectedAggregate: isFederalMetric(metricId) || isTrendMetric(metricId)
+    includeSelectedAggregate: !supportsSelectedAggregate(metricId)
       ? false
       : state.includeSelectedAggregate,
     states: state.states.length > 0 ? state.states : getMetricDefaultStates(metricId),
-    excludedStates: isTrendMetric(metricId) ? state.excludedStates : [],
+    excludedStates: supportsExcludedStates(metricId) ? state.excludedStates : [],
   };
 }
 
@@ -227,9 +214,7 @@ export function parseExplorerState(
     view: validViews.includes(rawView as ExplorerView)
       ? (rawView as ExplorerView)
       : defaultExplorerState.view,
-    category: validCategories.includes(rawCategory as QueryRequest["options"]["category"])
-      ? (rawCategory as QueryRequest["options"]["category"])
-      : defaultExplorerState.category,
+    category: rawCategory?.trim() || defaultExplorerState.category,
     aggregation: validAggregations.includes(rawAggregation as QueryRequest["options"]["aggregation"])
       ? (rawAggregation as QueryRequest["options"]["aggregation"])
       : defaultExplorerState.aggregation,
@@ -304,7 +289,7 @@ export function buildQueryRequestFromState(
         ? false
         : state.includeSelectedAggregate,
       excludedGeographies:
-        state.metricId === "pce-growth-yoy" || state.metricId === "pce-inflation-yoy"
+        supportsExcludedStates(state.metricId)
           ? state.excludedStates
           : [],
     },

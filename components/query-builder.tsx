@@ -4,6 +4,11 @@ import type { MetricCatalogSummary } from "@/lib/catalog/types";
 import type { QueryRequest } from "@/lib/contracts/query";
 import type { ExplorerState, ExplorerView } from "@/lib/explore-config";
 import { stateOptions } from "@/lib/geography";
+import {
+  isFederalMetric,
+  supportsExcludedStates,
+  supportsSelectedAggregate,
+} from "@/lib/metric-capabilities";
 
 function MultiSelect({
   label,
@@ -62,10 +67,9 @@ export function QueryBuilder({
   onChange: (patch: Partial<ExplorerState>) => void;
 }) {
   const selectedMetric = metricOptions.find((metric) => metric.id === state.metricId);
-  const isTrendMetric =
-    state.metricId === "pce-growth-yoy" || state.metricId === "pce-inflation-yoy";
-  const isFederalMetric =
-    selectedMetric?.family === "federal-inflows" || selectedMetric?.family === "gdp";
+  const federalMetric = isFederalMetric(state.metricId);
+  const excludedStatesSupported = supportsExcludedStates(state.metricId);
+  const selectedAggregateSupported = supportsSelectedAggregate(state.metricId);
 
   return (
     <section className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -186,7 +190,7 @@ export function QueryBuilder({
           <span className="font-medium">Comparison mode</span>
           <select
             value={state.aggregation}
-            disabled={isFederalMetric}
+            disabled={federalMetric}
             className="rounded-xl border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"
             onChange={(event) =>
               onChange({
@@ -203,14 +207,18 @@ export function QueryBuilder({
 
       <div className="grid gap-4 lg:grid-cols-2">
         <MultiSelect
-          label={isFederalMetric ? "State focus" : "States to compare"}
+          label={selectedMetric?.family === "rpp-price-levels"
+            ? "States to plot or exclude"
+            : federalMetric
+              ? "State focus"
+              : "States to compare"}
           value={state.states}
           onChange={(states) => onChange({ states })}
         />
         <MultiSelect
           label="States excluded from US comparison"
           value={state.excludedStates}
-          disabled={!isTrendMetric}
+          disabled={!excludedStatesSupported}
           onChange={(excludedStates) => onChange({ excludedStates })}
         />
       </div>
@@ -220,7 +228,7 @@ export function QueryBuilder({
           <input
             type="checkbox"
             checked={state.includeUsAggregate}
-            disabled={isFederalMetric}
+            disabled={federalMetric}
             onChange={(event) =>
               onChange({ includeUsAggregate: event.currentTarget.checked })
             }
@@ -231,7 +239,7 @@ export function QueryBuilder({
           <input
             type="checkbox"
             checked={state.includeSelectedAggregate}
-            disabled={isFederalMetric || isTrendMetric}
+            disabled={!selectedAggregateSupported}
             onChange={(event) =>
               onChange({ includeSelectedAggregate: event.currentTarget.checked })
             }

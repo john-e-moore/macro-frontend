@@ -85,4 +85,21 @@ export const explorerPresets: ExplorerPreset[] = [
       includeSelectedAggregate: false,
     },
   },
+  {
+    id: "rpp-exclusion",
+    label: "National price level",
+    description: "Estimate the national price level with selected states excluded.",
+    state: {
+      metricId: "rpp-national-price-level",
+      view: "multi_line",
+      category: "housing_rents",
+      aggregation: "selected_plus_us",
+      startYear: 2021,
+      endYear: 2024,
+      states: ["CA", "NY", "TX"],
+      excludedStates: ["CA", "NY"],
+      includeUsAggregate: true,
+      includeSelectedAggregate: false,
+    },
+  },
 ];

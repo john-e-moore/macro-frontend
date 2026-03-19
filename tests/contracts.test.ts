@@ -56,6 +56,27 @@ describe("contracts", () => {
     ).toBe("state");
   });
 
+  it("accepts metric-specific category ids in query requests", () => {
+    expect(
+      queryRequestSchema.parse({
+        metricIds: ["rpp-national-price-level"],
+        geography: {
+          level: "state",
+          values: ["CA", "NY"],
+        },
+        timeRange: {
+          startYear: 2021,
+          endYear: 2024,
+        },
+        view: "auto",
+        options: {
+          category: "housing_rents",
+          excludedGeographies: ["CA"],
+        },
+      }).options.category,
+    ).toBe("housing_rents");
+  });
+
   it("accepts export requests for csv and xlsx", () => {
     expect(
       exportRequestSchema.parse({

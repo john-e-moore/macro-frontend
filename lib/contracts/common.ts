@@ -28,14 +28,7 @@ export const metricDerivationKindSchema = z.enum([
   "implicit_price_index",
 ]);
 
-export const metricCategorySchema = z.enum([
-  "all",
-  "food",
-  "gas",
-  "housing",
-  "health",
-  "food_services",
-]);
+export const metricCategorySchema = z.string().trim().min(1).max(100);
 
 export const metricTransformSchema = z.enum([
   "level",
